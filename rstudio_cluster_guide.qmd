@@ -1,0 +1,128 @@
+---
+format: html
+title: Connecting to RStudio via the Cluster
+---
+
+## Connect via Linux
+
+##### Requirements
+
+- Linux system with a graphical session
+- X11 available (`echo $XDG_SESSION_TYPE` should return `x11`)
+
+##### Step 1 — Open a Terminal
+
+Open a terminal on your Linux machine.
+
+##### Step 2 — Connect via SSH with X11 Forwarding
+
+Run:
+
+    ssh -X c9881023@leo5.uibk.ac.at
+
+When prompted, enter the password:
+
+    dijada37
+
+##### Step 3 — Load the Required Module
+
+After logging in, run:
+
+    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
+
+##### Step 4 — Start RStudio
+
+Run:
+
+    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
+
+RStudio should now start via X11 forwarding.
+
+---
+
+## Connect via macOS
+
+##### Requirements
+
+- macOS with **XQuartz** installed (provides the X11 server)
+- Terminal access
+
+##### Step 1 — Install XQuartz
+
+1. Download and install XQuartz from: https://www.xquartz.org  
+2. Log out and back in (or restart) after installing.
+
+##### Step 2 — Start XQuartz
+
+Open **XQuartz** (Applications → Utilities → XQuartz).
+
+Optional check in Terminal:
+
+    echo $DISPLAY
+
+##### Step 3 — Connect via SSH with X11 Forwarding
+
+In macOS Terminal, run:
+
+    ssh -Y c9881023@leo5.uibk.ac.at
+
+When prompted, enter the password:
+
+    dijada37
+
+##### Step 4 — Load the Required Module
+
+    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
+
+##### Step 5 — Start RStudio
+
+    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
+
+---
+
+## Connect via Windows (MobaXterm)
+
+##### Requirements
+
+- Windows
+- **MobaXterm** installed (includes SSH and X11 server)
+
+Download from: https://mobaxterm.mobatek.net/
+
+##### Step 1 — Start MobaXterm
+
+Open **MobaXterm**.
+
+Ensure X11 is enabled:
+- Settings → X11 → X11 forwarding enabled
+
+##### Step 2 — Create SSH Session
+
+1. Click **Session**
+2. Choose **SSH**
+3. Remote host:
+
+    leo5.uibk.ac.at
+
+4. Specify username:
+
+    c9881023
+
+5. Ensure **X11-Forwarding** is checked  
+6. Click **OK**
+
+Enter the password when prompted:
+
+    dijada37
+
+##### Step 3 — Load the Required Module
+
+In the MobaXterm terminal:
+
+    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
+
+##### Step 4 — Start RStudio
+
+    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
+
+RStudio should now open in a separate window via X11.
