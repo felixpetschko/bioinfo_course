@@ -16,11 +16,11 @@ execute:
 
 ## Introduction
 
-This tutorial explains how to use RStudio on the Leo5 high-performance computing (HPC) cluster at the university. RStudio is the most widely used tool for working with R code and can also be installed on a local computer. However, some R tools require high compute power and storage, which is why using an HPC cluster can be necessary. Usually, HPC clusters are operated through command-line commands. In this case, we need the graphical RStudio interface, so a special network protocol (X11) is required, which means additional setup steps on some operating systems.
+This tutorial explains how to use RStudio on the Leo5 high-performance computing (HPC) cluster of the University of Innsbruck. RStudio is the most widely used tool for working with R code and can also be installed on a local computer. However, some R tools require high compute power and storage, which is why using an HPC cluster can be necessary. Usually, HPC clusters are operated through command-line commands. In this case, we need the graphical RStudio interface, so a special network protocol (X11) is required, which means additional setup steps on some operating systems.
 
 ## Requirements
 
-To connect to the Leo5 HPC cluster, you need access to the university network. This means you are either physically on campus and connected to the university network, or you establish a VPN connection from your local computer. Instructions for setting up the VPN connection are available here: https://www.uibk.ac.at/de/zid/anleitungen-und-dokumentationen/datennetz/vpn/
+To connect to the Leo5 HPC cluster, you need access to the university network. This means you are either physically on campus and connected to the university network, or you establish a VPN connection from your local computer. Instructions for setting up the VPN connection are available here: [https://www.uibk.ac.at/de/zid/anleitungen-und-dokumentationen/datennetz/vpn/](https://www.uibk.ac.at/de/zid/anleitungen-und-dokumentationen/datennetz/vpn/).
 
 On the Leo5 cluster, you must log in with dedicated user accounts. These accounts are not the same as accounts used for other university services such as LFU access. In this tutorial, the account `c9881023` is used. The password will be provided by the course instructors. Be careful when changing files and settings, because this account is shared with other participants.
 
@@ -28,7 +28,7 @@ On the Leo5 cluster, you must log in with dedicated user accounts. These account
 
 ### Windows
 
-On Windows, the tool MobaXterm is used to connect with the required network protocol. Download `MobaXterm Home Edition v26.0 (Portable edition)` from: https://mobaxterm.mobatek.net/download-home-edition.html
+On Windows, the tool MobaXterm is used to connect with the required network protocol. Download `MobaXterm Home Edition v26.0 (Portable edition)` from: [https://mobaxterm.mobatek.net/download-home-edition.html](https://mobaxterm.mobatek.net/download-home-edition.html).
 
 Extract the ZIP folder and run the included `.exe` file. Click `New Session` and then choose `SSH`. In the `Remote Host` field, enter `leo5.uibk.ac.at`, and in the `Username` field, enter `c9881023`. Then click `OK`. A connection to the cluster should now be established.
 
@@ -44,8 +44,7 @@ A connection to the cluster should now be established.
 
 ### macOS
 
-On macOS, the tool XQuartz is required to establish a connection with the needed network protocol. Download XQuartz here:
-https://www.xquartz.org
+On macOS, the tool XQuartz is required to establish a connection with the needed network protocol. Download XQuartz here: [https://www.xquartz.org](https://www.xquartz.org).
 
 Install the tool and restart your computer. Open XQuartz (`Applications -> Utilities -> XQuartz`) and then run the following command in Terminal:
 
@@ -57,13 +56,13 @@ A connection to the cluster should now be established.
 
 ## Starting RStudio
 
-At this point, you should be connected to the cluster based on your operating system. Next, RStudio should be started in a virtual container. This uses Singularity. Load it with the following command while connected to the cluster:
+At this point, you should be connected to the cluster based on your operating system. Next, we want to start RStudio in a virtual container via the tool Singularity. Load it with the following command in the terminal:
 
 ```bash
 module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
 ```
 
-Then run the following command to start RStudio in the Singularity container:
+Then run this command to start RStudio in the Singularity container:
 
 ```bash
 singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio
