@@ -1,128 +1,57 @@
 ---
 format: html
-title: Connecting to RStudio via the Cluster
+title: RStudio HPC Cluster Tutorial
 ---
 
-## Connect via Linux
+Im folgenden Tutorial wird gezeigt, wie man RStudio auf dem high performance computing cluster Leo5 der Universität verwendet. RStudio ist das bekannteste Tool, mit R Code zu arbeiten und kann grundsätzlich auch auf dem lokalen Computer installiert werden. Allerdings benötigen manche R-Tools viel Rechenleistung und Speicherplatz, weshalb die Nutzung auf einem HPC Cluster nötig sein kann. Üblicherweise wird der HPC Cluster über Befehle in der Kommandozeile bedient. In diesem Fall benötigen wir aber die grafische Oberfläche von RStudio. Deshalb wird ein spezielles Netzwerkprotokoll (X11) benötigt, wodurch auf manchen Betriebssystemen zusätzliche Schritte nötig sind.
 
-##### Requirements
+## Voraussetzungen
 
-- Linux system with a graphical session
-- X11 available (`echo $XDG_SESSION_TYPE` should return `x11`)
+Um sich mit dem Leo5 HPC Cluster zu verbinden, wird der Zugang zum Universitätsnetz benötigt. Das heißt, man ist entweder direkt am Universitätsstandort vor Ort mit dem Internet der Universität verbunden, oder es muss eine VPN Verbindung vom lokalen Computer aus hergestellt werden. Eine Anleitung zur Herstellung der VPN Verbindung findet sich unter folgendem Link: https://www.uibk.ac.at/de/zid/anleitungen-und-dokumentationen/datennetz/vpn/
 
-##### Step 1 — Open a Terminal
+Auf dem Leo5 Cluster muss man sich mit speziellen Useraccounts anmelden. Diese Accounts stimmen nicht mit jenen von anderen Universtätsdiensten wie dem LFU Zugang überein. Im Rahmen dieses Tutorials wird der Useraccount c9881023 verwendet. Das Passwort wird Ihnen von der Lehrveranstaltungsleitung bekanntgegeben. Seien Sie vorsichtig beim Ändern von Dateien und Einstellungen, da Sie sich den Account mit anderen Teilnehmern teilen!
 
-Open a terminal on your Linux machine.
+## Windows
 
-##### Step 2 — Connect via SSH with X11 Forwarding
+Hier wird das Tool MobaXterm zur Herstellung einer Verbindung mit dem nötigen Netzwerkprotokoll gebraucht. Laden Sie unter folgendem Link “ MobaXterm Home Edition v26.0 (Portable edition)” herunter: https://mobaxterm.mobatek.net/download-home-edition.html
 
-Run:
+Extrahieren Sie den ZIP folder und führen Sie die darin enthaltene .exe Datei aus. Klicken Sie auf “New Session” und wählen Sie dann “SSH” aus. Geben Sie im Feld “Remote Host” die Adresse “leo5.uibk.ac.at” und im Feld “Username” den Accountnamen c9881023 ein. Klicken Sie jetzt auf “OK”. Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-    ssh -X c9881023@leo5.uibk.ac.at
+## Linux
 
-When prompted, enter the password:
+Hier sollte für gewöhnlich kein zusätzliches Tool für das Netzwerkprotokoll benötigt werden. Öffnen sie die Kommandozeile und geben sie folgenden Befehl ein:
 
-    dijada37
+```bash
+ssh -X c9881023@leo5.uibk.ac.at
+```
 
-##### Step 3 — Load the Required Module
+Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-After logging in, run:
+## macOS
 
-    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
+Hier wird das Tool XQuartz zur Herstellung einer Verbindung mit dem nötigen Netzwerkprotokoll gebraucht. Laden Sie XQuartz unter folgendem Link herunter:
+https://www.xquartz.org
 
-##### Step 4 — Start RStudio
+Installieren Sie das Tool und starten Sie den Computer anschließend neu. Öffnen Sie XQuartz (Applications → Utilities → XQuartz) und geben Sie danach folgenden Befehl im Terminal ein:
 
-Run:
+```bash
+ssh -Y c9881023@leo5.uibk.ac.at
+```
 
-    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
+Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-RStudio should now start via X11 forwarding.
+## RStudio
 
----
+Nun sollten Sie mit dem Cluster entsprechend Ihres jeweiligen Betriebssystems verbunden sein. Als nächstes soll RStudio in einem virtuellen Container gestartet werden. Dazu wird das Tool Singularity verwendet - laden Sie das Tool mit folgendem Befehl in der Kommandozeile, wenn Sie mit dem Cluster verbunden sind:
 
-## Connect via macOS
+```bash
+module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
+```
 
-##### Requirements
+Führen Sie als nächstes folgenden Befehl aus, um RStudio im virtuellen Container mit Singularity zu starten:
 
-- macOS with **XQuartz** installed (provides the X11 server)
-- Terminal access
+```bash
+singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio
+```
 
-##### Step 1 — Install XQuartz
-
-1. Download and install XQuartz from: https://www.xquartz.org  
-2. Log out and back in (or restart) after installing.
-
-##### Step 2 — Start XQuartz
-
-Open **XQuartz** (Applications → Utilities → XQuartz).
-
-Optional check in Terminal:
-
-    echo $DISPLAY
-
-##### Step 3 — Connect via SSH with X11 Forwarding
-
-In macOS Terminal, run:
-
-    ssh -Y c9881023@leo5.uibk.ac.at
-
-When prompted, enter the password:
-
-    dijada37
-
-##### Step 4 — Load the Required Module
-
-    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
-
-##### Step 5 — Start RStudio
-
-    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
-
----
-
-## Connect via Windows (MobaXterm)
-
-##### Requirements
-
-- Windows
-- **MobaXterm** installed (includes SSH and X11 server)
-
-Download from: https://mobaxterm.mobatek.net/
-
-##### Step 1 — Start MobaXterm
-
-Open **MobaXterm**.
-
-Ensure X11 is enabled:
-- Settings → X11 → X11 forwarding enabled
-
-##### Step 2 — Create SSH Session
-
-1. Click **Session**
-2. Choose **SSH**
-3. Remote host:
-
-    leo5.uibk.ac.at
-
-4. Specify username:
-
-    c9881023
-
-5. Ensure **X11-Forwarding** is checked  
-6. Click **OK**
-
-Enter the password when prompted:
-
-    dijada37
-
-##### Step 3 — Load the Required Module
-
-In the MobaXterm terminal:
-
-    module load singularityce/4.3.0-python-3.11.9-gcc-13.3.0-n5qceek
-
-##### Step 4 — Start RStudio
-
-    singularity exec -B /scratch /scratch/c102180/rstudio_202601+392+R433.sif rstudio &
-
-RStudio should now open in a separate window via X11.
+Jetzt sollte sich die grafische Oberfläche von RStudio in einem neuen Fenster öffnen.
