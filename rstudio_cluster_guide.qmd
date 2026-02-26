@@ -1,7 +1,20 @@
 ---
-format: html
 title: RStudio HPC Cluster Tutorial
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true
+execute:
+  echo: true
+  message: true
+  warning: true
 ---
+
+## Introduction
 
 Im folgenden Tutorial wird gezeigt, wie man RStudio auf dem high performance computing cluster Leo5 der Universität verwendet. RStudio ist das bekannteste Tool, mit R Code zu arbeiten und kann grundsätzlich auch auf dem lokalen Computer installiert werden. Allerdings benötigen manche R-Tools viel Rechenleistung und Speicherplatz, weshalb die Nutzung auf einem HPC Cluster nötig sein kann. Üblicherweise wird der HPC Cluster über Befehle in der Kommandozeile bedient. In diesem Fall benötigen wir aber die grafische Oberfläche von RStudio. Deshalb wird ein spezielles Netzwerkprotokoll (X11) benötigt, wodurch auf manchen Betriebssystemen zusätzliche Schritte nötig sind.
 
@@ -11,13 +24,15 @@ Um sich mit dem Leo5 HPC Cluster zu verbinden, wird der Zugang zum Universitäts
 
 Auf dem Leo5 Cluster muss man sich mit speziellen Useraccounts anmelden. Diese Accounts stimmen nicht mit jenen von anderen Universtätsdiensten wie dem LFU Zugang überein. Im Rahmen dieses Tutorials wird der Useraccount c9881023 verwendet. Das Passwort wird Ihnen von der Lehrveranstaltungsleitung bekanntgegeben. Seien Sie vorsichtig beim Ändern von Dateien und Einstellungen, da Sie sich den Account mit anderen Teilnehmern teilen!
 
-## Windows
+## Verbindung nach Betriebssystem
+
+### Windows
 
 Hier wird das Tool MobaXterm zur Herstellung einer Verbindung mit dem nötigen Netzwerkprotokoll gebraucht. Laden Sie unter folgendem Link “ MobaXterm Home Edition v26.0 (Portable edition)” herunter: https://mobaxterm.mobatek.net/download-home-edition.html
 
 Extrahieren Sie den ZIP folder und führen Sie die darin enthaltene .exe Datei aus. Klicken Sie auf “New Session” und wählen Sie dann “SSH” aus. Geben Sie im Feld “Remote Host” die Adresse “leo5.uibk.ac.at” und im Feld “Username” den Accountnamen c9881023 ein. Klicken Sie jetzt auf “OK”. Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-## Linux
+### Linux
 
 Hier sollte für gewöhnlich kein zusätzliches Tool für das Netzwerkprotokoll benötigt werden. Öffnen sie die Kommandozeile und geben sie folgenden Befehl ein:
 
@@ -27,7 +42,7 @@ ssh -X c9881023@leo5.uibk.ac.at
 
 Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-## macOS
+### macOS
 
 Hier wird das Tool XQuartz zur Herstellung einer Verbindung mit dem nötigen Netzwerkprotokoll gebraucht. Laden Sie XQuartz unter folgendem Link herunter:
 https://www.xquartz.org
@@ -40,7 +55,7 @@ ssh -Y c9881023@leo5.uibk.ac.at
 
 Nun sollte eine Verbindung zum Cluster aufgebaut werden.
 
-## RStudio
+## RStudio starten
 
 Nun sollten Sie mit dem Cluster entsprechend Ihres jeweiligen Betriebssystems verbunden sein. Als nächstes soll RStudio in einem virtuellen Container gestartet werden. Dazu wird das Tool Singularity verwendet - laden Sie das Tool mit folgendem Befehl in der Kommandozeile, wenn Sie mit dem Cluster verbunden sind:
 
