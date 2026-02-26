@@ -16,7 +16,7 @@ execute:
 
 ## Introduction
 
-This tutorial explains how to use RStudio on the Leo5 high-performance computing (HPC) cluster of the University of Innsbruck. RStudio is the most widely used tool for working with R code and can also be installed on a local computer. However, some R tools require high compute power and storage, which is why using an HPC cluster can be necessary. Usually, HPC clusters are operated through command-line commands. In this case, we need the graphical RStudio interface, so a special network protocol (X11) is required, which means additional setup steps on some operating systems.
+This tutorial explains how to use RStudio on the Leo5 high-performance computing (HPC) cluster from the University of Innsbruck. RStudio is the most widely used tool for working with R code and can also be installed on a local computer. However, some R tools require high compute power and storage, which is why using an HPC cluster can be necessary. Usually, HPC clusters are operated through terminal commands. For this tutorial, we need the graphical RStudio interface, so a special network protocol (X11) is required. This means additional setup steps on some operating systems.
 
 ## Requirements
 
