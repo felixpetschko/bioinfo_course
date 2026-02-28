@@ -1,0 +1,675 @@
+---
+title: Single-cell RNA sequencing analysis
+author: "Prof. Francesca Finotello"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true   # TOC stays visible while scrolling
+execute:
+  echo: true
+  message: true
+  warning: true
+---
+
+# Introduction
+
+In this exercise, we will analyze a single-cell RNA sequencing (scRNA-seq) dataset from the human pancreas generated with the [CelSeq2](https://link.springer.com/article/10.1186/s13059-016-0938-8) technology [(Muraro et al. Genome Biology, 2016)](https://doi.org/10.1186/s13059-016-0938-8).
+
+# Exercises
+
+## Data access and initialization
+
+Before we begin the analysis, let's set the seed of the random number generator as indicated below to ensure reproducible plots and results. Please note, however, that the results and generated plots may still show slight differences under certain circumstances.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+```
+
+For the analysis, we will be using the [Seurat](https://satijalab.org/seurat/) workflow, which we can load with the `library` function.
+
+```{r, warning=FALSE, message=FALSE}
+library(Seurat)
+```
+
+We can use the `readRDS` function to load `pancreas.rds` from the "Data" directory. The dataset is already stored as a Seurat object, so we can assign it to a variable called `pancreas`.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- readRDS("../Data/pancreas.rds")
+```
+
+Let's have a look at the `pancreas` object:
+
+```{r, warning=FALSE, message=FALSE}
+
+print(pancreas)
+
+```
+
+It contains count data for 34,363 genes across 2,223 cells.
+
+The `pancreas` object has a metadata slot containg, besides the cell type labels reported in the `orig.ident` column (for now, all equal to the the project name "pancreas"), two covariates that are important for the quality control (QC) step:
+
+-   `nCount_RNA`: the number of total counts per barcode;
+-   `nFeature_RNA`: the number of detected features (i.e. genes) per cell;
+
+```{r, warning=FALSE, message=FALSE}
+
+head(pancreas@meta.data)
+
+```
+
+## Initial exploration and QC
+
+We can use Seurat to perform **quality control (QC)** of the scRNA-seq data and a series of diagnostic plots. Let's visualize the distribution of our two QC variables with a violin plot. A violin plot depicts the distribution of numeric data for one or more groups using density curves.
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(
+  pancreas,
+  features = c("nFeature_RNA", "nCount_RNA"),
+  ncol = 2
+)
+```
+
+We can also use a scatterplot to visualize the relationship between `nCount_RNA` and `nFeature_RNA`. These two variables have a strong correlation (Pearson's r = 0.86).
+
+```{r, warning=FALSE, message=FALSE}
+FeatureScatter(
+  pancreas,
+  feature1 = "nCount_RNA",
+  feature2 = "nFeature_RNA"
+)
+```
+
+This code prints a short summary of the Seurat object before filtering.
+
+```{r, warning=FALSE, message=FALSE}
+print(pancreas)
+```
+
+We now want to filter out cells that have a very high number of detected genes or total counts, as they could represent doublets. For this analysis, we will not, insted filter out low-counts cells, in order not to discard cells with small szie or overall mRNA content. But different approaches are possible depending on the dataset and biological questions.
+
+Based on the QC plots, we will only keep cells that have `nFeature_RNA` lower than 10,000 **and** `nCount_RNA` lower than 100,000. To this end, we will use the `subset` function, which return subsets of data which meet specific conditions.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- subset(
+  pancreas,
+  subset = nFeature_RNA < 10000 & nCount_RNA < 100000
+)
+
+print(pancreas)
+```
+
+❓ **Question:** How many cells have we removed?
+
+## Normalization and highly variable genes
+
+This analytical step aims at **preprocessing** our dataset. We normalize the count data using the `NormalizeData` function. By default, this function performs global-scaling normalization using the "LogNormalize" approach, which:
+
+-   Divides gene counts by the total count depth in each cell;
+-   Multiplies this by a (10,000 by default, can be changed with the `scale.factor` argument);
+-   Log-transforms the result.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- NormalizeData(pancreas)
+```
+
+Now that gene expression levels are comparable across cells, we can identify highly variable genes (HVG), i.e. genes that are highly expressed in some cells and lowly expressed in others, using the `FindVariableFeatures` function. For this analysis, we will only consider the top 2,000 most variable genes.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- FindVariableFeatures(pancreas, nfeatures = 2000)
+```
+
+Let's have a look at the list of HVG, which can be extracted from the `pbmc` object using the `VariableFeatures` function. We will use the `head` function to visualize only the top 10 ones:
+
+```{r, warning=FALSE, message=FALSE}
+head(VariableFeatures(pancreas), 10)
+```
+
+We can also save this list in a variable called `top10`:
+
+```{r, warning=TRUE, message=TRUE}
+top10 <- head(VariableFeatures(pancreas), 10)
+```
+
+We can now make a scatterplot showing the relationship between the average expression and standardized variance for all genes, with HVG highlighted in red, using the `VariableFeaturePlot` function. By invoking the `LabelPoints` function on the plot we have just generated, we can then label the top-10 most variable genes saved in `top10` by passing this list to the `points` argument.
+
+```{r, warning=FALSE, message=FALSE}
+plot1 <- VariableFeaturePlot(pancreas) # To allow more overlapping labels
+options(ggrepel.max.overlaps = Inf)
+LabelPoints(plot = plot1, 
+            points = top10, 
+            repel = TRUE)
+```
+
+❓ **Question:** How can we make the same plot but labelling the top 20 most variable genes?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, class.source = 'fold-hide', warning=FALSE, message=FALSE}
+
+top20 <- head(VariableFeatures(pancreas), 20)
+
+plot2 <- VariableFeaturePlot(pancreas)
+LabelPoints(plot = plot2,
+            points = top20,
+            repel = TRUE)
+
+```
+
+</details>
+
+We finally apply a linear transformation, namely *scaling*, which is a standard pre-processing step prior to dimensional reduction techniques like PCA to ensure that all features have a similar range of values and, thus, equal "weight" in the analysis. We will use the `ScaleData` function, which by default:
+
+-   Shifts the expression of each gene, so that the mean expression across cells is 0 (i.e. removes the mean across cells);
+-   Scales the expression of each gene, so that the variance across cells is 1 (i.e. divides by the variance across cells).
+
+We have to specify the `features = rownames(pancreas)` argument to make sure that all genes are scaled and not only the highly variable ones, which is the default behaviour of this function.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- ScaleData(pancreas, 
+                      features = rownames(pancreas))
+```
+
+## Dimensionality reduction
+
+This analytical setp is focuses on **dimensionality reduction**. We start with principal component analysis (PCA) on the scaled data using the `RunPCA` function. By default, only the data from the previously HVG are used as input.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- RunPCA(pancreas)
+```
+
+The PCA results are saved into the `pancreas` object. In the example below, we visualize the top 5 genes (positively or negatively) associated with the top 4 principal components (PC):
+
+```{r, warning=FALSE, message=FALSE}
+print(
+  pancreas[["pca"]],
+  dims = 1:4,
+  nfeatures = 5
+)
+```
+
+Using the `VizDimLoadings` function, we can also visualize the loadings (positive or negative) of the top genes associated with the principal components of interest. To do so, we need to specify which type of dimensionality reduction results we want to access (`reduction = "pca"`) and the dimensions we are interested in (here, principal components PC1 and PC2 as indicated by `dims = 1:2`).
+
+```{r, warning=FALSE, message=FALSE}
+VizDimLoadings(pancreas, 
+               reduction = "pca", 
+               dims = 1:2)
+```
+
+By default, the `VizDimLoadings` function visualize the top PCA-associated genes selected based on their absolute loadings. If we want to have instead a *balanced* view of the negative and positive loadings, with equal representation, we need to set the `balanced` parameter to TRUE. The `nfeatures` parameters specify how many genes should be considered.
+
+```{r, warning=FALSE, message=FALSE}
+VizDimLoadings(pancreas, reduction = "pca", 
+               dims = 1:2, 
+               balanced = TRUE,
+               nfeatures = 10)
+```
+
+❓ **Question:** Which is the gene with the largest negative association to PC1?
+
+The top associated genes, and their loadings, can be also visualized in an heatmap using the `DimHeatmap` function. The `cells` argument can be used to restrict the analysis to the most "extreme" cells to speed up the computation. In the resulting heatmap, both cells and genes are sorted according to their scores, allowing the detection of interesting or uninteresting patterns. These plots are useful, for instance, to identify PC strongly associated to cell cycle genes (e.g. TOP2A, MKI67) or to decide which PC to include in downstream analyses.
+
+```{r, warning=FALSE, message=FALSE}
+DimHeatmap(pancreas, 
+           reduction = "pca", 
+           dims = 1, 
+           cells = 500)
+```
+
+We can also plot more than one component, e.g. PC1 and PC20:
+
+```{r, warning=FALSE, message=FALSE}
+DimHeatmap(pancreas, 
+           reduction = "pca", 
+           dims = c(1, 20), 
+           cells = 500)
+```
+
+❓ **Question:** What do you notice when comparing PC1 and PC20 heatmaps?
+
+❓ **Question:** How can we visualize the gene loadings of the first 9 PC using the `DimHeatmap` function?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, class.source = 'fold-hide'}
+
+DimHeatmap(pancreas, 
+           reduction = "pca",
+           dims = 1:6,
+           cells = 500)
+
+```
+
+</details>
+
+The next step of the analysis is clustering, which is performed on the single-cell PCA scores. To this end, we have to select the top PC that are needed to capture most of the data variance.
+
+To decide how many PC to select, we can use an heuristic approach: we can plot the standard deviation or variance captured by each PC using the `ElbowPlot` function and (try to) identify an "elbow", where the curve levels off, indicating that components to the right of this point add limited information. With the command below, we generate an elbow plot for the first 50 PC:
+
+```{r, warning=FALSE, message=FALSE}
+ElbowPlot(pancreas, 
+          reduction = "pca", 
+          ndims = 50)
+```
+
+In this plot, we can see an elbow at about 30 PC, which we will use as a cut-off for downstream analysis.
+
+Deciding how many PC to consider is not trivial and might require several iterations, for instance, to evaluate how the final results in terms of cell clustering and annotations are affected by different choices. In general, results are not heavily affected when more PC are considered (e.g. 15-30), whereas can change drastically if a low number of PC is chosen (e.g. 3-5).
+
+## Clustering and visualization
+
+We can now proceed with **clustering** analysis to identify group of cells with similar transcriptomes. For clustering, Seurat uses a graph-based approach based on the previously identified PC. Briefly, it builds namely a KNN graph based on the Euclidean distance between cells in PCA space. Then, it refines the edge weights between pairs of cells based on the overlap in their local neighborhoods. This step is performed using the `FindNeighbors` function, which takes as input the previously defined dimensionality of the dataset (here, the first 30 PC).
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- FindNeighbors(pancreas, 
+                          dims = 1:30)
+```
+
+Based on this graph, cells are then clustered using the Louvain algorithm (default in the `FindClusters` function) by performing modularity optimization;\
+The `resolution` argument controls cluster granularity: set to 1.0 by default, can be increased (decreased) to obtain more (fewer) clusters. Values in the \[0.4-1.2\] rage are recommended for single-cell datasets of around 3,000 cells, but can be increased for larger datasets. In the example below, we use a resolution of 0.5.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- FindClusters(pancreas, 
+                         resolution = 0.5, 
+                         random.seed = 1234)
+```
+
+The clusters are saved in the metadata slot (`seurat_clusters` column) and can be accessed using the `Idents` function.
+
+```{r, warning=FALSE, message=FALSE}
+ head(pancreas@meta.data)
+ head(Idents(pancreas), 5)
+```
+
+We can now visualize the clustering results onto the 2D PCA plot using the `DimPlot` function:
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(pancreas,
+        reduction = "pca")
+```
+
+To better visualize scRNA-seq data, we can use non-linear dimensionality reduction approaches like t-SNE or UMAP.
+
+We can run the t-SNE algorithm considering only the first 10 PC using the `RunTSNE` function as shown in the following command:
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- RunTSNE(pancreas, 
+                dims = 1:10,
+                seed.use = 1234)
+```
+
+Now that the t-SNE results have been saved into the `pbmc` object, they can be plotted using again the `DimPlot` function and specifying `reduction = "tsne"`.
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(pancreas, 
+        reduction = "tsne")
+```
+
+❓ **Question:** Which dimensionality reduction approach works better in separating cells belonging to different clusters, PCA or t-SNE?
+
+Similarly, we can compute the UMAP using the `RunUMAP` function.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- RunUMAP(
+  pancreas,
+  dims = 1:30,
+  n.neighbors = 30,
+  min.dist = 0.3,
+  seed.use = 1234
+)
+```
+
+❓ **Question:** How can we visualize the UMAP plot with single cells coloured according to clustering results?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, class.source = 'fold-hide', warning=FALSE, message=FALSE}
+DimPlot(pancreas, 
+        reduction = "umap")
+```
+
+</details>
+
+❓ **Question:** How many clusters do we get?
+
+Let try to run the clustering with a lower resolution (0.2) to obtain fewer clusters.
+
+```{r, warning=FALSE, message=FALSE}
+pancreas <- FindClusters(pancreas, 
+                         resolution = 0.2, 
+                         random.seed = 1234)
+DimPlot(pancreas, reduction = "umap")
+```
+
+We get 7 clusters. Let's keep this clustering for the rest for the exercise.
+
+The `VlnPlot` can be also used as we did at the beginning of this exercise to plot the number of detected genes (`nFeature_RNA`), total counts (`nCount_RNA`), and percentage of mitochondrial RNA (`percent.mt`), but stratified by cluster.
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(
+  pancreas,
+  features = c("nFeature_RNA", "nCount_RNA"),
+  ncol = 2
+)
+```
+
+❓ **Question:** Which clusters of cells has (overall) the highest number of detected genes and total counts?
+
+Also the UMAP plot can be colored according to these QC variables:
+
+```{r, warning=FALSE, message=FALSE}
+FeaturePlot(pancreas, 
+            features = c("nFeature_RNA", "nCount_RNA"))
+```
+
+## Data-driven cell-type annotation
+
+This step focuses on annotation of the identified clusters. We can perform differential expression analysis to identify cluster-specific markers.
+
+The `FindAllMarkers` function identifies markers specific for each cluster. By specifying the `only.pos = TRUE` argument, we can look only at positive markers --otherwise, by default, both positive and negative ones are reported. 
+
+```{r, warning=FALSE, message=FALSE}
+pancreas.markers <- FindAllMarkers(pancreas, 
+                                   only.pos = TRUE)
+head(pancreas.markers)
+```
+
+We can save the results in our current working directory as a .csv file with the current command:
+
+```{r, warning=FALSE, message=FALSE}
+write.csv(
+  pancreas.markers,
+  quote = FALSE,
+  row.names = FALSE,
+  file = "pancreas_DEGs.csv"
+)
+```
+
+We can also directly inspect the top marker (i.e., first hit) for each cluster from the `pancreas.markers` data frame, which contains the gene markers, with top markers on top, for each cluster (`pancreas.markers$cluster`). In this code, where `duplicated(pancreas.markers$cluster)` returns TRUE for repeated cluster values after their first appearance. The `!` symbol reverses the TRUE/FALSE, so that only the first hit (non-duplicated) hase TRUE. This logical index is used to access the corresponding gene name.
+
+```{r, warning=FALSE, message=FALSE}
+top_markers <- pancreas.markers[!duplicated(pancreas.markers$cluster), ]
+top_markers
+```
+
+We can also print the top-3 markers per cluster using a `for` loop:
+
+```{r, warning=FALSE, message=FALSE}
+for (clus in unique(pancreas.markers$cluster)) {
+  top_3 <- head(pancreas.markers$gene[pancreas.markers$cluster == clus],3)
+  cat("Cluster", clus, ":", top_3, "\n")
+}
+```
+
+We can now visualize the expression of the top markers (`top_markers$gene`) in every cluster using a violin plot, to assess their cluster specificity.
+
+```{r, warning=FALSE, message=FALSE}
+#| fig-width: 12
+#| fig-height: 16
+
+VlnPlot(
+  pancreas,
+  features = top_markers$gene,
+  ncol = 2
+)
+```
+❓ **Question:** How can we can visualize the expression of the top markers on the UMAP? _Hint:_ use `FeaturePlot`.
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+```{r, warning=FALSE, message=FALSE}
+#| fig-width: 12
+#| fig-height: 16
+
+FeaturePlot(
+  pancreas,
+  features = top_markers$gene,
+  ncol = 2
+)
+```
+
+</details>
+
+## Knowledge-driven manual annotation
+
+Let's imagine we have some prior knowledge on cell type-specific markers, as indicated in the table below, that allows us to assign each cluster to a cell identity:
+
+| Markers             | Cell type       |
+|:--------------------|:----------------|
+| GCG, IRX2, TTR      | α cell          |
+| INS, PDX1, MAFA     | β cell          |
+| SST, HHEX, RBP4     | δ cell          |
+| PPY, PAX6, ISL1     | γ cell          |
+| GHRL, XKR4, PCSK1   | ε cell          |
+| AMY2A, CPA1, PRSS1  | acinar cell     |
+| KRT19, CFTR, SLC4A4 | ductal cell     |
+
+Let's check with a violin plot in which cluster(s) the α-cell makers are the most expressed. Cluster 0 has the the highest overall expression for these three marker genes and likely represents α cells.
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("GCG", "IRX2", "TTR"))
+```
+
+We can also visualize the expression of the these markers using a Ridgeline plot:
+
+```{r, warning=FALSE, message=FALSE}
+RidgePlot(pancreas,
+  features = c("GCG", "IRX2", "TTR"))
+```
+
+❓ **Question:** How can we can visualize the expression of the these markers on the UMAP?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, warning=FALSE, message=FALSE}
+FeaturePlot(
+  pancreas,
+  features = c("GCG", "IRX2", "TTR"),
+  ncol = 3
+)
+```
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent β cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+Cluster 1 represents β cells.
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("INS", "PDX1", "MAFA"))
+```
+
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent δ cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+Cluster 4 represents δ cells. 
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("SST", "HHEX", "RBP4"))
+```
+
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent γ cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+Cluster 5 represents γ cells. 
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("PPY", "PAX6", "ISL1"))
+```
+
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent ε cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+The markers for this cell type do not show a cluster-specific expression. ε cells are rare pancreas cells (~1%), which might be even absent from this dataset.
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("GHRL", "XKR4", "PCSK1"))
+```
+
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent acinar cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+Cluster 2 represents acinar cells. 
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("AMY2A", "CPA1", "PRSS1"))
+```
+
+</details>
+
+❓ **Question:** Using a violin plot, can you say which cluster is most likely to represent ductal cells?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+Cluster 3 represents ductal cells. 
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = c("KRT19", "CFTR", "SLC4A4"))
+```
+
+</details>
+
+If we now put everything together, we have a preliminary annotation for the clusters: 
+
+| Markers             | Cell type       | Cluster         |
+|:--------------------|:----------------|:----------------|
+| GHRL, XKR4, PCSK1   | ε cell          | <span style="color:#cc0000;">Absent?</span> |
+| GCG, IRX2, TTR      | α cell          | 0               |
+| INS, PDX1, MAFA     | β cell          | 1               |
+| AMY2A, CPA1, PRSS1  | acinar cell     | 2               | 
+| KRT19, CFTR, SLC4A4 | ductal cell     | 3               |
+| SST, HHEX, RBP4     | δ cell          | 4               |
+| PPY, PAX6, ISL1     | γ cell          | 5               |
+| <span style="color:#cc0000;">???</span> | <span style="color:#cc0000;">???</span> | 6 |
+
+As the identity of cluster 6 is not yet clear, let's have a look at its top markers identified in the previous analysis.
+
+```{r, warning=FALSE, message=FALSE}
+clus6_markers <- pancreas.markers[pancreas.markers$cluster == 6, ]
+head(clus6_markers)
+```
+
+We can also visualize the top-3 markers with a violin plot to assess their higher expression in cluster 6:
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(pancreas, features = clus6_markers$gene[1:3])
+```
+
+By doing some literature search, we can conclude that these genes represent fibroblasts or, more specifically, stellate cells in the pancreas. 
+
+We can update our cell type annotation table accordingly
+
+| Markers             | Cell type       | Cluster         |
+|:--------------------|:----------------|:----------------|
+| GCG, IRX2, TTR      | α cell          | 0               |
+| INS, PDX1, MAFA     | β cell          | 1               |
+| AMY2A, CPA1, PRSS1  | acinar cell     | 2               | 
+| KRT19, CFTR, SLC4A4 | ductal cell     | 3               |
+| SST, HHEX, RBP4     | δ cell          | 4               |
+| PPY, PAX6, ISL1     | γ cell          | 5               |
+| MRC2, PRRX1, CL12A1 | stellate cell   | 6               |
+
+Let's renominate the cluster and plot a final, cell-type-annotated UMAP:
+
+```{r, warning = FALSE, message = FALSE}
+new.cluster.ids <- c("α cell", "β cell", "acinar cell", "ductal cell", 
+                     "δ cell", "γ cell", "stellate cell")
+names(new.cluster.ids) <- levels(pancreas)
+pancreas <- RenameIdents(pancreas, new.cluster.ids)
+
+DimPlot(pancreas, 
+        reduction = "umap", 
+        label = TRUE, 
+        pt.size = 0.5) + NoLegend()
+```
+
+Finally, the `DotPlot` function can be used to visualize, for a set of genes specified through the `features` parameter, how their expression levels change across clusters. In the dot plot, the size of the dot encodes the percentage of cells within a cluster, while the color encodes the average expression level across all cells within a cluster. In the example code below, we use the top markers determined in the data-driven analysis, and the `+ RotatedAxis()` is added to rotate the labels on the x-axis to make them more easily readable:
+
+```{r, warning=FALSE, message=FALSE}
+DotPlot(pancreas,
+  features = top_markers$gene) + RotatedAxis()
+```
+
+## Analysis of breast cancer scRNA-seq data
+
+In this exercise, we can perform a similar analysis on scRNA-seq dataset from human breast cancer samples, generated with the  [10x Genomics](www.10xgenomics.com) technology [(Wu et al. Nature Genetics, 2021)](https://doi.org/10.1038/s41588-021-00911-1).
+
+As before, we can use the `readRDS` function to load the `wu_sc.rds` file from the "Data" directory as a Seurat object:
+
+```{r, warning=FALSE, message=FALSE}
+wu_sc <- readRDS("../Data/wu_sc.rds")
+```
+
+The analysis can be inspired by the previous exercise, with parameter settings adapted for this dataset. Let's try to obtain about 10 clusters (low resolution, <0.1), and to use the following prior knowledge about cell type-specific markers to guide cell type annotation:
+
+| Markers                   | Cell type        |
+|:--------------------------|:-----------------|
+| CD79A, MS4A1, MZB1        | B cell           |
+| CALD1, COL1A2, COL6A2     | Fibroblast       |
+| AIF1, LYZ, LST1           | Myeloid cell     |
+| NKG7, CTSW, CD7           | T/NK cell        |
+| PLVAP, CLEC14A, ADGRL4    | Endothelial cell |
+| KRT8, KRT18, KRT19        | Tumor cells      |
+
+
+
