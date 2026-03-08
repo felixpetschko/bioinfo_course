@@ -1,0 +1,282 @@
+---
+title: "R programming basics (part 2a)"
+author: "Prof. Francesca Finotello"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true   # TOC stays visible while scrolling
+---
+
+# Introduction
+
+In this exercise set, you will learn the basics of programming in R by creating functions, using loops, and working with conditional execution.
+
+# Exercises
+
+## Exercise 1
+
+Write a function `square(x)` that takes as input a number, specified by the `x` parameter, and computes x to the power of 2 (i.e., $x^2$), and returns this result using the `return` function.
+
+<details>
+
+<summary>Click to see the solution code</summary>
+
+**Solution:**
+
+```{r}
+square <- function(x) {
+    x <- x^2
+    return(x)
+}
+```
+
+</details>
+
+Compute `5^2` with your function and verify it returns `25`.
+
+## Exercise 2
+
+Write a second function `powfun(x, y)` that computes "x to the power of y" (i.e., $x^y$) from the input data `x` and `y`.
+
+Verify that the results of `powfun(x = 6, y = 2)` correspond to the ones obtained with `square(x = 6)`.
+
+## Exercise 3
+
+Write a function called `fahrenheit_to_celsius` that converts temperatures from degrees Fahrenheit to degrees Celsius according to the following formula:
+
+$\text{Celsius} = (\text{Fahrenheit} - 32) \times 5 / 9$
+
+Check if 30 degrees Fahrenheit correspond to a temperature in degrees Celsius that is above 0.
+
+<details>
+
+<summary>Click to see the solution code</summary>
+
+**Solution:**
+
+```{r}
+fahrenheit_to_celsius <- function(temp_f) {
+  temp_c <- (temp_f - 32) * 5 / 9
+  return(temp_c)
+}
+```
+
+</details>
+
+## Exercise 4
+
+Write a second function called instead `celsius_to_fahrenheit` that converts temperatures from degrees Celsius to degrees Fahrenheit according to the following formula:
+
+$\text{Fahrenheit} = \text{Celsius} \times 9 / 5 + 32$
+
+## Exercise 5
+
+Write a function called `water_state` that takes as input the temperature `temp` in degrees Celsius and returns a *character* indicating if the water is in a **solid** (i.e., frozen, if `temp<0`), **gas** (if `temp>=100`), or **liquid** state. The final label should be returned with the `return` function. *Hint:* use `if`, `else if`, and `else` conditional statements.
+
+```{r, include=FALSE, echo=FALSE}
+water_state <- function(temp) {
+    if (temp < 0) {
+        res <- "solid"
+    } else if (temp < 100) {
+        res <- "liquid"
+    } else {
+        res <- "gas"
+    }
+    return(res)
+}
+```
+
+Check that the function returns the following results:
+
+```{r}
+water_state(-1)
+water_state(0)
+water_state(10)
+water_state(100)
+water_state(120)
+```
+
+## Exercise 6
+
+The definition of the mean of a vector of numbers `x` is as follows:
+
+$$
+\bar{x} = \frac{\sum_{i=1}^{n} x_i}{n} 
+$$ 
+
+This corresponds to summing up all numbers in `x` and dividing this sum by the number of elements in `x`.
+
+Imagine we have the following vector
+
+```{r}
+x <- c(2, 4, 10, 0, 2, 4)
+```
+
+We can compute the mean directly with the `mean` function, or as the ratio between the sum and the number of its elements:
+
+```{r}
+mean(x)
+sum(x) / length(x)
+```
+
+Let's imagine instead that we want to define a new function called `my_mean` which walks through the vector one element at a time and, at each iteration updates the current sum and count of the vector elements.
+
+For this, within the function we would need two elements to keep track of the number of elements in (`x_count`) and the sum of the element values (`x_sum`). These two elements should be initialized at the beginning of the function (**within** the function), setting them to 0 (i.e., no vector element has been considered yet):
+
+```{r}
+x_count <- 0
+x_sum <- 0
+```
+
+We can then use a `for` loop to walk through all the positions of the input vector `x`, from 1 to `length(x)`. At every iteration, we should update `x_count` to reflect that we count an additional (`+1`) element, and `x_sum` to add the value of the current element of `x`. At the end of the loop, we can compute the ratio between `x_sum` and `x_count`, and return the results with the `return` function. Define such the `my_mean` function.
+
+<details>
+
+<summary>Click to see the solution code</summary>
+
+**Solution:**
+
+```{r, include=TRUE}
+my_mean <- function(x) {
+    x_sum <- 0
+    x_count <- 0
+    for (i in 1:length(x)) {
+        x_sum <- x_sum + x[i]
+        x_count <- x_count + 1
+    }
+    return(x_sum / x_count)
+}  
+```
+
+</details>
+
+Verify that it gives the same results of the official `mean` function, as tested below:
+
+```{r}
+x <- seq(-21, 100)
+y <- c(2, 3, 7, 2, 0, 10)
+my_mean(x); mean(x)
+my_mean(y); mean(y)
+```
+
+## Exercise 7
+
+Let's compute the `my_min` function, that takes as input a vector `x` of numbers, uses a loop to iterate across the elements of the vector to identify its smallest value.
+
+The function should use a variable called `x_min` to be used to store the current minimum. We need to initialize using the biggest value possible, otherwise we risk that no element in the vector is chosen:
+
+```{r}
+x_min <- Inf
+```
+
+Then we should use a loop to walk through all the elements of the vector. For each iteration, we check if the current element is smaller than `x_min`: if yes, we save the current value in `x_min`; otherwise, we disregard the current element and move to the next one. At the end of the loop, the function should `return` the minimum saved in `x_min`.
+
+Implement the `my_min` function as suggested above (`min` and `which.min` cannot be used!) and verify that it gives the same results of the official `min` function, as tested below:
+
+```{r, include=FALSE}
+my_min <- function(x) {
+    x_min <- Inf
+    for (i in 1:length(x)) {
+        if (x[i] < x_min) x_min <- x[i]
+    }
+    return(x_min)
+}  
+```
+
+```{r}
+x <- seq(-21, 100)
+y <- c(2, 3, 7, 2, 0, 10)
+my_min(x); min(x)
+my_min(y); min(y)
+```
+
+## Exercise 8
+
+Without executing the code, what value does `i` have after running the code below?
+
+1.  100
+2.  4
+3.  2
+4.  None of the above
+
+```{r, echo=TRUE}
+y <- c(-1, 100, 2, 4)
+
+for (i in 1:length(y)) {
+  if (y[i] == 100) {
+    break
+  }
+}
+```
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:** 3. 2
+
+</details>
+
+## Exercise 9
+
+Without executing the code, what value does `i` have after running the code below?
+
+1.  9
+2.  6
+3.  4
+4.  None of the above
+
+```{r, echo=TRUE}
+j <- 0
+x <- c(0, -1, 3, -4, 4, 2)
+
+for (i in 1:length(x)) {
+  if (x[i] > 0) {
+    j <- j + x[i]
+  }
+}
+```
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:** 2. 6
+
+</details>
+
+## Exercise 10
+
+Without executing the code, what value does `warn` have after running the code below?
+
+1.  Hypoglycemia
+2.  Hyperglycemia
+3.  Normoglycemia
+4.  NA
+
+```{r, echo=TRUE}
+
+glycemia <- 120
+hypo_thresh <- 70; hyper_thresh <- 130 # mg/dL
+warn <- NA
+if (glycemia < hypo_thresh) {
+  warn <- "Hypoglycemia"
+}  else  if (glycemia > hyper_thresh) {
+  warn <- "Hyperglycemia"
+} else {
+  warn <- "Normoglycemia"
+}
+
+```
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:** 3. "Normoglycemia"
+
+</details>
