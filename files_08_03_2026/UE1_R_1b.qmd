@@ -137,7 +137,7 @@ $$
 The updated `info` data.frame should look like this:
 
 ```{r, include=TRUE, echo=FALSE}
-info <- readRDS("../../Data/bmi.rds")
+info <- readRDS("~/locked/Data/bmi.rds")
 info[,"bmi"] <- info[,"weight"] / info[,"height"]^2
 print(info)
 ```

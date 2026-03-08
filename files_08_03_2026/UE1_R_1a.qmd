@@ -153,7 +153,7 @@ Check their lengths: are they correct?
 
 ## Exercise 11
 
-Load the "bmi.rds" file from the "Data" directory using `readRDS` (the full path is `../Data/bmi.rds`), and save it to a variable called `info`. This file contains information regarding the weight in kg and height in m of a group of people.
+Load the "bmi.rds" file from the "Data" directory using `readRDS` (the full path is `~/locked/Data/bmi.rds`), and save it to a variable called `info`. This file contains information regarding the weight in kg and height in m of a group of people.
 
 Check the class of the imported object.
 
