@@ -37,6 +37,11 @@ library(glmGamPoi)
 library(presto)
 library(spacedeconv)
 library(SpatialExperiment)
+
+plot_dir <- "spatial_plots"
+show_saved_plot <- function(filename) {
+  knitr::include_graphics(file.path(plot_dir, filename))
+}
 ```
 
 We can use the `readRDS` function to load `BrCa_spatial.rds` from the "Data" directory and assign it to a variable called `brca_sp`.
@@ -46,7 +51,7 @@ The path to "Data" assumes a specific folder structure. Adjust it to match the l
 :::
 
 ```{r, warning=FALSE, message=FALSE}
-brca_sp <- readRDS("../Data/brca_spatial.rds")
+brca_sp <- readRDS("../Data/brca_spatial_s4.rds")
 print(brca_sp)
 ```
 
@@ -55,8 +60,12 @@ This object contains:
 -   A spot-by-gene count matrix (3798 spots, 36,601 genes)
 -   An Hematoxylin and Eosin (H&E) image of the breast cancer, which can visualized with the following code:
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialPlot(brca_sp, alpha = 0)
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("01_spatial_plot.png")
 ```
 
 In the Seurat object, the spot by gene expression matrix is similar to a typical "RNA" Assay of scRNA-seq data, but contains spot level, not single-cell level data.
@@ -71,28 +80,40 @@ head(brca_sp@meta.data)
 
 Plot QC violin
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 VlnPlot(brca_sp, 
         features = c("nCount_Spatial", "nFeature_Spatial"),
         pt.size = 0.1) + NoLegend()
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("02_qc_violin.png")
+```
+
 Plot nCount_Spatial feat
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, 
                    features = "nCount_Spatial",
                    image.alpha = 0) + 
   theme(legend.position = "right")
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("03_ncount_spatial.png")
+```
+
 How to plot nFeature_Spatial feat
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, 
                    features = "nCount_Spatial",
                    image.alpha = 0) + 
   theme(legend.position = "right")
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("04_nfeature_spatial_placeholder.png")
 ```
 Rotated????
 
@@ -113,23 +134,39 @@ brca_sp <- SCTransform(brca_sp,
 Gene expression visualization In Seurat, we have functionality to explore and interact with the inherently visual nature of spatial data, using `SpatialFeaturePlot`.
 EPCAM ??? Epithelial cell adhesion molecule, widely used to identify epithelial cells. KRT8, KRT18, KRT19 ??? Cytokeratins expressed in luminal epithelial cells. ERBB2 (HER2) ??? Especially in HER2+ tumors. FAP ??? Fibroblast activation protein; highly expressed in cancer-associated fibroblasts (CAFs). COL1A1, COL1A2, COL3A1 ??? Collagen genes, extracellular matrix proteins.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, 
                    features = c("KRT8", "COL1A2", "CD8B"))
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("05_marker_triplet.png")
+```
+
 The default parameters in Seurat emphasize the visualization of molecular data.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, features = "KRT8")
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("06_krt8_default.png")
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, features = "KRT8", pt.size.factor = 1)
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("07_krt8_ptsize1.png")
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, features = "KRT8", alpha = c(0.1, 1))
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("08_krt8_alpha.png")
 ```
 Dimensionality reduction, clustering, and visualization We can then proceed to run dimensionality reduction and clustering on the RNA expression data, using the same workflow as we use for scRNA-seq analysis.
 
@@ -153,33 +190,49 @@ brca_sp <- RunUMAP(brca_sp,
 
 We can then visualize the results of the clustering either in UMAP space (with `DimPlot`.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 DimPlot(brca_sp, 
         reduction = "umap", 
         label = TRUE)
 ```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("09_umap_clusters.png")
+```
 or overlaid on the image with SpatialDimPlot().
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialDimPlot(brca_sp, label = TRUE, label.size = 3)
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("10_spatial_clusters.png")
 ```
 As there are many colors, it can be challenging to visualize which voxel belongs to which cluster. We have a few strategies to help with this. Setting the label parameter places a colored box at the median of each cluster You can also use the cells.highlight parameter to demarcate particular cells of interest on a SpatialDimPlot(). This can be very useful for distinguishing the spatial localization of individual clusters, as we show below:
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialDimPlot(brca_sp, 
                cells.highlight = 
                  CellsByIdentities(object = brca_sp, idents = c(1, 4)),
                facet.highlight = TRUE, ncol =2)
 ```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("11_spatial_highlight_clusters.png")
+```
 Identification of Spatially Variable Features Seurat offers two workflows to identify molecular features that correlate with spatial location within a tissue. The first is to perform differential expression based on pre-annotated anatomical regions within the tissue, which may be determined either from unsupervised clustering or prior knowledge. This strategy works will in this case, as the clusters above exhibit clear spatial restriction.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 de_markers <- FindMarkers(brca_sp, ident.1 = 1, ident.2 = 4)
 head(de_markers)
 SpatialFeaturePlot(object = brca_sp, 
                    features = rownames(de_markers)[1:4], 
                    alpha = c(0.1, 1), 
                    ncol = 2)  
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("12_de_markers_top4.png")
 ```
 
 ## Tissue composition analysis
@@ -265,12 +318,16 @@ DefaultAssay(brca_sp) <- "prediction.score.id"
 
 Let's plot cell estimates for selected cell types
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 SpatialFeaturePlot(brca_sp, 
                    features = c("Cancer Epithelial", "Endothelial",
                                 "Myeloid", "CAFs",
                                 "T-cells", "B-cells"), 
                    ncol = 2)
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("13_label_transfer_scores.png")
 ```
 
 ## Advanced spatial analysis with spacedeconv
@@ -317,7 +374,7 @@ brca_sdwls_res <- spacedeconv::deconvolute(spatial_obj = brca_spe,
 
 B cells.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_CAFs",
@@ -328,9 +385,13 @@ plot_spatial(
 )
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("14_spatialdwls_cafs.png")
+```
+
 B cells, smooth.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_CAFs",
@@ -342,7 +403,11 @@ plot_spatial(
 )
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("15_spatialdwls_cafs_smooth.png")
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_Myeloid",
@@ -354,7 +419,11 @@ plot_spatial(
 )
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("16_spatialdwls_myeloid_smooth.png")
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_T.cells",
@@ -366,9 +435,13 @@ plot_spatial(
 )
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("17_spatialdwls_tcells_smooth.png")
+```
+
 Comparative plot
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 spacedeconv::plot_comparison(
   brca_sdwls_res,
   cell_type_1 = "spatialdwls_Myeloid",
@@ -385,9 +458,13 @@ spacedeconv::plot_comparison(
 )
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("18_myeloid_vs_cafs.png")
+```
+
 Most abundant.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 plot_most_abundant(
   brca_sdwls_res,
   method = "spatialdwls",
@@ -397,6 +474,10 @@ plot_most_abundant(
   min_abundance = 0.05,
   palette = "Accent"
 )
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("19_most_abundant.png")
 ```
 
 Footprint analysis of TF using collectri, using CPM data. Two steps.
@@ -427,7 +508,7 @@ brca_sdwls_res <- compute_activities(brca_sdwls_res,
 
 Plot progeny_JAK.STAT.
 
-```{r chunk-23}
+```{r chunk-23, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "progeny_JAK.STAT",
@@ -439,9 +520,13 @@ plot_spatial(
 )
 ```
 
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("20_progeny_jak_stat.png")
+```
+
 Plot progeny_TGFb.
 
-```{r chunk-24}
+```{r chunk-24, eval=FALSE}
 plot_spatial(
   spe = brca_sdwls_res,
   result = "progeny_TGFb",
@@ -451,4 +536,8 @@ plot_spatial(
   smooth = TRUE,
   density = FALSE
 )
+```
+
+```{r, echo=FALSE, out.width="100%"}
+show_saved_plot("21_progeny_tgfb.png")
 ```
