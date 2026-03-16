@@ -193,7 +193,7 @@ We first load the data,pre-process the scRNA-seq reference, and then perform lab
 Load the breast cancer reference scRNA-seq data into R and save it in a object called `brca_sc`:
 
 ```{r, warning=FALSE, message=FALSE}
-brca_sc <- readRDS("../Data/brca_sc.rds")
+brca_sc <- readRDS("../Data/brca_sc_s4.rds")
 ```
 
 We have 20,835 genes and 2,500 cells, with type annotations:
@@ -250,19 +250,17 @@ anchors <- FindTransferAnchors(reference = brca_sc,
                                normalization.method = "SCT",
                                reference.assay = "SCT",
                                query.assay = "SCT")
-predictions.assay <- TransferData(anchorset = anchors, 
-                                  query.assay = "Spatial",
-                                  slot = "counts",
-                                  refdata = brca_sc@meta.data$celltype_coarse, 
-                                  prediction.assay = TRUE)
+brca_sp <- TransferData(anchorset = anchors, 
+                        query = brca_sp,
+                        slot = "data",
+                        refdata = brca_sc@meta.data$celltype_coarse, 
+                        prediction.assay = TRUE)
 ```
 
-Run `predictions.assay@counts` as the next step of the workflow.
+Set the prediction assay as default for visualization.
 
 ```{r, warning=FALSE, message=FALSE}
-predictions.assay@counts <- predictions.assay@data 
-brca_sp[["predictions"]] <- predictions.assay
-DefaultAssay(brca_sp) <- "predictions"
+DefaultAssay(brca_sp) <- "prediction.score.id"
 ```
 
 Let's plot cell estimates for selected cell types
@@ -323,6 +321,8 @@ B cells.
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_CAFs",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "CAF",
   density = FALSE
 )
@@ -334,6 +334,8 @@ B cells, smooth.
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_CAFs",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "CAF",
   smooth = TRUE,
   density = FALSE
@@ -344,6 +346,8 @@ plot_spatial(
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_Myeloid",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "Myeloid",
   smooth = TRUE,
   density = FALSE
@@ -354,6 +358,8 @@ plot_spatial(
 plot_spatial(
   spe = brca_sdwls_res,
   result = "spatialdwls_T.cells",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "T cells",
   smooth = TRUE,
   density = FALSE
@@ -367,6 +373,8 @@ spacedeconv::plot_comparison(
   brca_sdwls_res,
   cell_type_1 = "spatialdwls_Myeloid",
   cell_type_2 = "spatialdwls_CAFs",
+  sample_id = "brca",
+  image_id = "lowres",
   density = FALSE,
   smooth = TRUE,
   title = "Myeloid vs. CAFs",
@@ -383,6 +391,8 @@ Most abundant.
 plot_most_abundant(
   brca_sdwls_res,
   method = "spatialdwls",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "Most abundant",
   min_abundance = 0.05,
   palette = "Accent"
@@ -421,6 +431,8 @@ Plot progeny_JAK.STAT.
 plot_spatial(
   spe = brca_sdwls_res,
   result = "progeny_JAK.STAT",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "JAK-STAT",
   smooth = TRUE,
   density = FALSE
@@ -433,6 +445,8 @@ Plot progeny_TGFb.
 plot_spatial(
   spe = brca_sdwls_res,
   result = "progeny_TGFb",
+  sample_id = "brca",
+  image_id = "lowres",
   title = "TGFb",
   smooth = TRUE,
   density = FALSE
