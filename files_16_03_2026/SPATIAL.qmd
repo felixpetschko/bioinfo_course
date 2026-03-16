@@ -1,0 +1,440 @@
+---
+title: Spatial transcriptomics data analysis
+author: "Prof. Francesca Finotello"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true
+execute:
+  echo: true
+  warning: true
+  message: true
+---
+
+# Guided analysis
+
+In this exercise, we will analyze a spatial transcriptomics dataset from a breast cancer generated with the [10x Genomics](www.10xgenomics.com) Visium platform.
+
+## Data access and initialization
+
+Before we begin the analysis, let's set the seed of the random number generator as indicated below to ensure reproducible plots and results. Please note, however, that the results and generated plots may still show slight differences under certain circumstances.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+```
+
+In this exercise, we will use the [Seurat](https://satijalab.org/seurat/) workflow and the [spacedeconv](https://github.com/omnideconv/spacedeconv) method. Let's import these two plus some associated packages needed for the whole analysis using the `library` function.
+
+```{r, warning=FALSE, message=FALSE}
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(glmGamPoi)
+library(presto)
+library(spacedeconv)
+library(SpatialExperiment)
+```
+
+We can use the `readRDS` function to load `BrCa_spatial.rds` from the "Data" directory and assign it to a variable called `brca_sp`.
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+```{r, warning=FALSE, message=FALSE}
+brca_sp <- readRDS("../Data/brca_spatial.rds")
+print(brca_sp)
+```
+
+This object contains:
+
+-   A spot-by-gene count matrix (3798 spots, 36,601 genes)
+-   An Hematoxylin and Eosin (H&E) image of the breast cancer, which can visualized with the following code:
+
+```{r, warning=FALSE, message=FALSE}
+SpatialPlot(brca_sp, alpha = 0)
+```
+
+In the Seurat object, the spot by gene expression matrix is similar to a typical "RNA" Assay of scRNA-seq data, but contains spot level, not single-cell level data.
+
+The initial preprocessing steps that we need to perform are similar to a typical scRNA-seq analysis. We first need to normalize the data in order to account for variance in sequencing depth across spots.
+
+As for scRNA-seq data, we have some QC covariates saved as metadata:
+
+```{r, warning=FALSE, message=FALSE}
+head(brca_sp@meta.data)
+```
+
+Plot QC violin
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(brca_sp, 
+        features = c("nCount_Spatial", "nFeature_Spatial"),
+        pt.size = 0.1) + NoLegend()
+```
+
+Plot nCount_Spatial feat
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, 
+                   features = "nCount_Spatial",
+                   image.alpha = 0) + 
+  theme(legend.position = "right")
+```
+
+How to plot nFeature_Spatial feat
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, 
+                   features = "nCount_Spatial",
+                   image.alpha = 0) + 
+  theme(legend.position = "right")
+```
+Rotated????
+
+These plots demonstrate that the variance in molecular counts across spots is not just technical in nature, but also is dependent on the tissue anatomy. 
+
+We use sctransform (Hafemeister and Satija, Genome Biology 2019), which which builds regularized negative binomial models of gene expression in order to account for technical artifacts while preserving biological variance. sctransform normalizes the data, detects high-variance features, and stores the data in the SCT assay.
+
+Load and initialize the spatial transcriptomics object.
+
+```{r, warning=FALSE, message=FALSE}
+brca_sp <- SCTransform(brca_sp, 
+                       assay = "Spatial", 
+                       verbose = FALSE)
+```
+
+## Gene-centric spatial analysis
+
+Gene expression visualization In Seurat, we have functionality to explore and interact with the inherently visual nature of spatial data, using `SpatialFeaturePlot`.
+EPCAM ??? Epithelial cell adhesion molecule, widely used to identify epithelial cells. KRT8, KRT18, KRT19 ??? Cytokeratins expressed in luminal epithelial cells. ERBB2 (HER2) ??? Especially in HER2+ tumors. FAP ??? Fibroblast activation protein; highly expressed in cancer-associated fibroblasts (CAFs). COL1A1, COL1A2, COL3A1 ??? Collagen genes, extracellular matrix proteins.
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, 
+                   features = c("KRT8", "COL1A2", "CD8B"))
+```
+
+The default parameters in Seurat emphasize the visualization of molecular data.
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, features = "KRT8")
+```
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, features = "KRT8", pt.size.factor = 1)
+```
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, features = "KRT8", alpha = c(0.1, 1))
+```
+Dimensionality reduction, clustering, and visualization We can then proceed to run dimensionality reduction and clustering on the RNA expression data, using the same workflow as we use for scRNA-seq analysis.
+
+Normalize and preprocess the expression data.
+
+```{r, warning=FALSE, message=FALSE}
+brca_sp <- RunPCA(brca_sp, 
+                  assay = "SCT", 
+                  verbose = FALSE)
+brca_sp <- FindNeighbors(brca_sp, 
+                         reduction = "pca", 
+                         dims = 1:30)
+brca_sp <- FindClusters(brca_sp, 
+                        resolution = 0.5, # default 0.8
+                        verbose = FALSE)
+brca_sp <- RunUMAP(brca_sp, 
+                   reduction = "pca", 
+                   dims = 1:30)
+```
+
+
+We can then visualize the results of the clustering either in UMAP space (with `DimPlot`.
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(brca_sp, 
+        reduction = "umap", 
+        label = TRUE)
+```
+or overlaid on the image with SpatialDimPlot().
+
+```{r, warning=FALSE, message=FALSE}
+SpatialDimPlot(brca_sp, label = TRUE, label.size = 3)
+```
+As there are many colors, it can be challenging to visualize which voxel belongs to which cluster. We have a few strategies to help with this. Setting the label parameter places a colored box at the median of each cluster You can also use the cells.highlight parameter to demarcate particular cells of interest on a SpatialDimPlot(). This can be very useful for distinguishing the spatial localization of individual clusters, as we show below:
+
+```{r, warning=FALSE, message=FALSE}
+SpatialDimPlot(brca_sp, 
+               cells.highlight = 
+                 CellsByIdentities(object = brca_sp, idents = c(1, 4)),
+               facet.highlight = TRUE, ncol =2)
+```
+Identification of Spatially Variable Features Seurat offers two workflows to identify molecular features that correlate with spatial location within a tissue. The first is to perform differential expression based on pre-annotated anatomical regions within the tissue, which may be determined either from unsupervised clustering or prior knowledge. This strategy works will in this case, as the clusters above exhibit clear spatial restriction.
+
+```{r, warning=FALSE, message=FALSE}
+de_markers <- FindMarkers(brca_sp, ident.1 = 1, ident.2 = 4)
+head(de_markers)
+SpatialFeaturePlot(object = brca_sp, 
+                   features = rownames(de_markers)[1:4], 
+                   alpha = c(0.1, 1), 
+                   ncol = 2)  
+```
+
+## Tissue composition analysis
+
+At \~50um, spots from the visium assay will encompass the expression profiles of multiple cells. For the growing list of systems where scRNA-seq data is available, users may be interested to deconvolute each of the spatial voxels to predict the underlying composition of cell types.
+
+Deconvolution vs. integration method We therefore apply the anchor-based integration workflow introduced in Seurat v3, that enables the probabilistic transfer of annotations from a reference to a query set. We therefore follow the label transfer workflow introduced here, taking advantage of sctransform normalization.
+
+We first load the data,pre-process the scRNA-seq reference, and then perform label transfer. The procedure outputs, for each spot, a probabilistic classification for each of the scRNA-seq derived classes. We add these predictions as a new assay in the Seurat object.
+
+Load the breast cancer reference scRNA-seq data into R and save it in a object called `brca_sc`:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sc <- readRDS("../Data/brca_sc.rds")
+```
+
+We have 20,835 genes and 2,500 cells, with type annotations:
+
+```{r, warning=FALSE, message=FALSE}
+print(brca_sc)
+head(brca_sc@meta.data)
+```
+
+We have three different annotations, with different resolution:
+
+```{r, warning=FALSE, message=FALSE}
+cat("Coarse resolution:", 
+    length(unique(brca_sc@meta.data$celltype_coarse)),
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype_coarse))
+cat("Medium resolution", 
+    length(unique(brca_sc@meta.data$celltype)), 
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype))
+cat("Fine-grained resolution", 
+    length(unique(brca_sc@meta.data$celltype_fine)), 
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype_fine))
+```
+
+We will the data to annotate the spatial data, according to the *coarse* labels, but first we need to perform data preprocessing with Seurat:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sc <- NormalizeData(brca_sc)
+brca_sc <- FindVariableFeatures(brca_sc, nfeatures = 2000)
+brca_sc <- ScaleData(brca_sc, features = rownames(brca_sc))
+brca_sc <- RunPCA(brca_sc)
+brca_sc <- FindNeighbors(brca_sc, 
+                       dims = 1:40) 
+brca_sc <- FindClusters(brca_sc, 
+                      resolution = 0.5,
+                      random.seed = 1234)
+brca_sc <- RunUMAP(brca_sc,
+                 dims = 1:40,
+                 n.neighbors = 30,
+                 min.dist = 0.3,
+                 seed.use = 1234)
+```
+
+Integration:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sp <- SCTransform(brca_sp,
+                       assay = "Spatial")
+brca_sc <- SCTransform(brca_sc)
+anchors <- FindTransferAnchors(reference = brca_sc, 
+                               query = brca_sp,
+                               normalization.method = "SCT",
+                               reference.assay = "SCT",
+                               query.assay = "SCT")
+predictions.assay <- TransferData(anchorset = anchors, 
+                                  query.assay = "Spatial",
+                                  slot = "counts",
+                                  refdata = brca_sc@meta.data$celltype_coarse, 
+                                  prediction.assay = TRUE)
+```
+
+Run `predictions.assay@counts` as the next step of the workflow.
+
+```{r, warning=FALSE, message=FALSE}
+predictions.assay@counts <- predictions.assay@data 
+brca_sp[["predictions"]] <- predictions.assay
+DefaultAssay(brca_sp) <- "predictions"
+```
+
+Let's plot cell estimates for selected cell types
+
+```{r, warning=FALSE, message=FALSE}
+SpatialFeaturePlot(brca_sp, 
+                   features = c("Cancer Epithelial", "Endothelial",
+                                "Myeloid", "CAFs",
+                                "T-cells", "B-cells"), 
+                   ncol = 2)
+```
+
+## Advanced spatial analysis with spacedeconv
+
+We will perform advanced analysis with spacedeconv. It assumes that the single-cell data is saved in the for of a SingleCellExperiment (REF), and the spatial data in the for of a SpatialExperiment (REF). Let's first convert the single-cell Seurat object using `as.SingleCellExperiment` and save it in a new variable called `brca_sc`:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sce <- as.SingleCellExperiment(brca_sc)
+```
+
+The conversion of the spatial data is not straightforward, so we will directly import the same breast cancer Visium dataset in a form of a spatialExperiment and save it in the `brca_spe` object:
+
+```{r, warning=FALSE, message=FALSE}
+brca_spe <- readRDS("../Data/brca_spe.rds")
+```
+
+Let's perform preprocessing with spacedeconv of the single-cell, as well as spatial data. We will specify a more explicit call to the functions,with for `package::function` to indicate that we refer to spacedeconv's function, and not to functions from other packages that could possibly have the same names:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sce <- spacedeconv::preprocess(brca_sce)
+brca_spe <- spacedeconv::preprocess(brca_spe)
+brca_spe <- spacedeconv::normalize(brca_spe, method = "cpm")
+```
+
+Let's use the spatialDWLS (REF) deconvolution method to derive a signature matrix based on our reference single-cell dataset, with cell types specified by the coarse annotations. We save the signature in an object called `brca_sdwls_sig`:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sdwls_sig <- spacedeconv::build_model(single_cell_obj = brca_sce,
+                                           cell_type_col = "celltype_coarse",
+                                           method = "spatialdwls",
+                                           verbose = TRUE)
+```
+
+We can now deconvolute the spatial data, CPM-normalized (`assay_sp = "cpm"), based on the signature saved in`brca_sdwls_sig`:
+
+```{r, warning=FALSE, message=FALSE}
+brca_sdwls_res <- spacedeconv::deconvolute(spatial_obj = brca_spe,
+                                           #single_cell_obj = brca_sce,
+                                           #cell_type_col = "celltype_coarse",
+                                           method = "spatialdwls",
+                                           assay_sp = "cpm",
+                                           signature = brca_sdwls_sig)
+```
+
+B cells.
+
+```{r, warning=FALSE, message=FALSE}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "spatialdwls_CAFs",
+  title = "CAF",
+  density = FALSE
+)
+```
+
+B cells, smooth.
+
+```{r, warning=FALSE, message=FALSE}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "spatialdwls_CAFs",
+  title = "CAF",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+```{r, warning=FALSE, message=FALSE}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "spatialdwls_Myeloid",
+  title = "Myeloid",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+```{r, warning=FALSE, message=FALSE}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "spatialdwls_T.cells",
+  title = "T cells",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Comparative plot
+
+```{r, warning=FALSE, message=FALSE}
+spacedeconv::plot_comparison(
+  brca_sdwls_res,
+  cell_type_1 = "spatialdwls_Myeloid",
+  cell_type_2 = "spatialdwls_CAFs",
+  density = FALSE,
+  smooth = TRUE,
+  title = "Myeloid vs. CAFs",
+  palette = "Purple-Green",
+  reverse_palette = TRUE,
+  shift_positive = FALSE, # Clarify
+  nDigits = 2
+)
+```
+
+Most abundant.
+
+```{r, warning=FALSE, message=FALSE}
+plot_most_abundant(
+  brca_sdwls_res,
+  method = "spatialdwls",
+  title = "Most abundant",
+  min_abundance = 0.05,
+  palette = "Accent"
+)
+```
+
+Footprint analysis of TF using collectri, using CPM data. Two steps.
+
+```{r, warning=FALSE, message=FALSE}
+tf_ref <- get_decoupleR_reference(method = "collectri", 
+                                  organism = "human")
+brca_sdwls_res <- compute_activities(brca_sdwls_res, 
+                                     reference = tf_ref, 
+                                     method = "wmean", 
+                                     assay = "cpm")
+```
+
+# Homework
+
+spacedeconv analysis (on which objects) use a quick first-generation method, scoring ESTIMATE (compartment) EPIC PW analysis with progeny (code) Plot cells, X, Y, Z PW X, Y, Z Compare
+
+Footprint analysis of Pathways using Progeny
+
+```{r, warning=FALSE, message=FALSE}
+pw_ref <- get_decoupleR_reference(method = "progeny", 
+                                  organism = "human")
+brca_sdwls_res <- compute_activities(brca_sdwls_res, 
+                                     reference = pw_ref, 
+                                     method = "wmean", 
+                                     assay = "cpm")
+```
+
+Plot progeny_JAK.STAT.
+
+```{r chunk-23}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "progeny_JAK.STAT",
+  title = "JAK-STAT",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Plot progeny_TGFb.
+
+```{r chunk-24}
+plot_spatial(
+  spe = brca_sdwls_res,
+  result = "progeny_TGFb",
+  title = "TGFb",
+  smooth = TRUE,
+  density = FALSE
+)
+```
