@@ -1,1 +1,2 @@
 Data/** filter=lfs diff=lfs merge=lfs -text
+spatial_bundle/Data/** filter=lfs diff=lfs merge=lfs -text
