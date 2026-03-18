@@ -19,7 +19,7 @@ execute:
 
 # Guided analysis
 
-In this exercise, we will perform cell-type deconvolution of bulk RNA sequencing (RNA-seq) data generated from human blood samples ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)). Blood samples were obtained from healthy donors, and used to create mixture of peripheral blood mononuclear cells (PBMC) and and polymorphonuclear (PMN) cells, which were then subjected to RNA-seq with the [Illumina](https://www.illumina.com/) technology.
+In this exercise, we will perform cell-type deconvolution of bulk RNA sequencing (RNA-seq) data generated from human blood samples ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)). Blood samples were obtained from healthy donors, and used to create mixtures of peripheral blood mononuclear cells (PBMC) and polymorphonuclear (PMN) cells, which were then subjected to RNA-seq with the [Illumina](https://www.illumina.com/) technology.
 
 ## Data access and initialization
 
@@ -27,6 +27,7 @@ Before we begin the analysis, let's set the seed of the random number generator 
 
 ```{r, warning=FALSE, message=FALSE}
 set.seed(1234)
+data_dir <- "/gpfs/gpfs1/scratch/c9881023/shared/Data"
 ```
 
 For the analysis, we will be using [immunedeconv](https://github.com/omnideconv/immunedeconv), a unified interface to different 1-generation deconvolution tools ([Sturm et al. Bioinformatics, 2019](https://academic.oup.com/bioinformatics/article/35/14/i436/5529146)). We will also use the R-implementation of the Color Brewer (https://colorbrewer2.org/) palette resource. We can load both packages using the `library` function.
@@ -40,7 +41,7 @@ Let's load the gene expression matrix from the Finotello et al. study. The matri
 
 ```{r, warning=FALSE, message=FALSE}
 
-finotello_tpm <- readRDS("../Data/finotello_tpm.rds")
+finotello_tpm <- readRDS(file.path(data_dir, "finotello_tpm.rds"))
 dim(finotello_tpm)
 head(finotello_tpm)
 
@@ -56,7 +57,7 @@ finotello_mcp <- deconvolute_mcp_counter(finotello_tpm)
 The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
 :::
 
-Let's check the result matrix, which has a celltype-by-sample format, especially to see which cell types were quantified. Moreover, by summing up the cell-type quantifications across all cell-types in a sample, we can see that they do not sum up to 0 (i.e. 100%), as they are adimensional scores and not cell fractions.
+Let's check the result matrix, which has a celltype-by-sample format, especially to see which cell types were quantified. Moreover, by summing up the cell-type quantifications across all cell-types in a sample, we can see that they do not sum up to 1 (i.e. 100%), as they are adimensional scores and not cell fractions.
 
 ```{r, warning=FALSE, message=FALSE}
 dim(finotello_mcp)
@@ -100,7 +101,7 @@ which.max(finotello_mcp[celltype,])
 
 </details>
 
-We want now to test on the same dataset a deconvolution method, rather than a scoring ones. We will focus on quanTIseq ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)), which we can run through the `deconvolute_quantiseq` function in immunedeconv. Besides providing the object with the TPM values, we need to specifiy that the data come from an RNA-seq experiment and not microarrays (`arrays = FALSE`), it is from blood and not tumor samples (`tumor = FALSE`), and we want to apply a correction for mRNA abundance bias (`scale_mrna = TRUE`).
+We want now to test on the same dataset a deconvolution method, rather than a scoring one. We will focus on quanTIseq ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)), which we can run through the `deconvolute_quantiseq` function in immunedeconv. Besides providing the object with the TPM values, we need to specify that the data come from an RNA-seq experiment and not microarrays (`arrays = FALSE`), it is from blood and not tumor samples (`tumor = FALSE`), and we want to apply a correction for mRNA abundance bias (`scale_mrna = TRUE`).
 
 ```{r}
 
@@ -249,7 +250,7 @@ Load the input data files into R.
 
 ```{r, warning=FALSE, message=FALSE}
 
-finotello_truth <- readRDS("../Data/finotello_facs.rds")
+finotello_truth <- readRDS(file.path(data_dir, "finotello_facs.rds"))
 dim(finotello_truth)
 head(finotello_truth)
 rownames(finotello_truth)
@@ -315,11 +316,11 @@ for (i in 1:length(ccells)) {
 
 ❓ **Question:** How would you consider the deconvolution performance for CD8+ T cells? And for regulatory T cells (Tregs)?
 
-We can also generate a similar plot were we visualize all cell types in the same plot, but with different colors. To do this, we can convert the two matrices of cell fractions into vectors, and save an associated vector with the color for every sample and cell type:
+We can also generate a similar plot where we visualize all cell types in the same plot, but with different colors. To do this, we can convert the two matrices of cell fractions into vectors, and save an associated vector with the color for every sample and cell type:
 
 ```{r, warning=FALSE, message=FALSE}
-finotello_truth_sel_v <- as.numeric(finotello_truth_sel)
-finotello_quanTIseq_sel_v<- as.numeric(finotello_quanTIseq_sel)
+finotello_truth_sel_v <- as.numeric(as.matrix(finotello_truth_sel))
+finotello_quanTIseq_sel_v <- as.numeric(as.matrix(finotello_quanTIseq_sel))
 labels <- rep(rownames(finotello_truth_sel), 
               times = ncol(finotello_truth_sel))
 colors <- pal_12[as.factor(labels)]
@@ -373,8 +374,8 @@ We can load, from the "Data" folder, the gene expression matrix (TPM-normalized)
 
 ```{r, warning=FALSE, message=FALSE}
 
-hoek_tpm <- readRDS("../Data/hoek_tpm.rds")
-hoek_truth <- readRDS("../Data/hoek_facs.rds")
+hoek_tpm <- readRDS(file.path(data_dir, "hoek_tpm.rds"))
+hoek_truth <- readRDS(file.path(data_dir, "hoek_facs.rds"))
 rownames(hoek_truth)
 
 ```
@@ -392,17 +393,20 @@ hoek_epic <- deconvolute_epic(hoek_tpm,
 rownames(hoek_epic)
 ```
 
-As you notice by comparing the cell names to the ground truth ones, some can be directly compared like the "Monocytes", while some like "Bcells" and "NKcells" needs to be renamed in the object of deconvolution results, e.g.:
+As you notice by comparing the cell names to the ground truth ones, some can be directly compared, like "Monocytes", while some, like "Bcells" and "NKcells", need to be renamed in the object of deconvolution results, e.g.:
 
 ```{r, warning=FALSE, message=FALSE, echo=TRUE, eval=TRUE}
 idx <- which(rownames(hoek_epic) == "Bcells")
 rownames(hoek_epic)[idx] <- "B cells" # With a space
 ```
 
-Moreover, we need to add a new row for the quantification of "T cells", calculated as the sum of "CD4_Tcells" and "CD8_Tcells", to be able to compare them to the ground-truth data:
+Moreover, we need to add a new row for the quantification of "T cell", calculated as the sum of "CD4_Tcells" and "CD8_Tcells", to be able to compare it to the ground-truth data:
 
 ```{r, warning=FALSE, message=FALSE, echo=TRUE, eval=TRUE}
-hoek_epic["T cells"] <- hoek_epic["CD4_Tcells"] + hoek_epic["CD8_Tcells"]
+hoek_epic <- rbind(
+  hoek_epic,
+  "T cell" = hoek_epic["CD4_Tcells", ] + hoek_epic["CD8_Tcells", ]
+)
 ```
 
 Check carefully the cell types present in the `hoek_epic` and `hoek_truth` objects, and adapt the former accordingly. After that, proceed with an analysis similar to that presented in the guided exercise, putting a special focus on the visualization of the per-sample cellular composition and the agreement of deconvolution results with the ground-truth cell fractions.
