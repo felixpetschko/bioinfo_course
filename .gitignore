@@ -2,3 +2,5 @@ rstudio_cluster_guide_files/
 *.html
 omnipathr-log/
 files_16_03_2026/spatial_objects/
+spatial_exercise/Data/brca_spatial_s4.rds
+spatial_exercise/Data/brca_spe.rds
