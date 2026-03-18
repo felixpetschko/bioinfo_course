@@ -1,0 +1,408 @@
+---
+title: Cell-type deconvolution analysis
+author: "Prof. Francesca Finotello"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true   # TOC stays visible while scrolling
+
+execute:
+  echo: true
+  message: true
+  warning: true
+  error: false
+---
+
+# Guided analysis
+
+In this exercise, we will perform cell-type deconvolution of bulk RNA sequencing (RNA-seq) data generated from human blood samples ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)). Blood samples were obtained from healthy donors, and used to create mixture of peripheral blood mononuclear cells (PBMC) and and polymorphonuclear (PMN) cells, which were then subjected to RNA-seq with the [Illumina](https://www.illumina.com/) technology.
+
+## Data access and initialization
+
+Before we begin the analysis, let's set the seed of the random number generator as indicated below to ensure reproducible plots and results.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+```
+
+For the analysis, we will be using [immunedeconv](https://github.com/omnideconv/immunedeconv), a unified interface to different 1-generation deconvolution tools ([Sturm et al. Bioinformatics, 2019](https://academic.oup.com/bioinformatics/article/35/14/i436/5529146)). We will also use the R-implementation of the Color Brewer (https://colorbrewer2.org/) palette resource. We can load both packages using the `library` function.
+
+```{r, warning=FALSE, message=FALSE}
+library(immunedeconv)
+library(RColorBrewer)
+```
+
+Let's load the gene expression matrix from the Finotello et al. study. The matrix report transcripts per million (TPM)-normalized values for 19423 genes and 9 samples.
+
+```{r, warning=FALSE, message=FALSE}
+
+finotello_tpm <- readRDS("../Data/finotello_tpm.rds")
+dim(finotello_tpm)
+head(finotello_tpm)
+
+```
+
+Via immunedeconv, we can run bulk RNA-seq data cell-type quantification using multiple tools. Let's try first a very quick scoring method (gene-set-based) called MCP-counter ([Becht et al. Genome Biology, 2016](https://link.springer.com/article/10.1186/s13059-016-1070-5)). We can perform this analysis very quickly using the `deconvolute_mcp_counter` function from immunedeconv, and save the results in an object called `finotello_mcp`.
+
+```{r}
+finotello_mcp <- deconvolute_mcp_counter(finotello_tpm) 
+```
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+Let's check the result matrix, which has a celltype-by-sample format, especially to see which cell types were quantified. Moreover, by summing up the cell-type quantifications across all cell-types in a sample, we can see that they do not sum up to 0 (i.e. 100%), as they are adimensional scores and not cell fractions.
+
+```{r, warning=FALSE, message=FALSE}
+dim(finotello_mcp)
+head(finotello_mcp)
+rownames(finotello_mcp)
+apply(finotello_mcp, 2, sum) 
+```
+
+We can now select a certain cell type and visualize with a barplot its abundance score (not cell fractions!) across the various samples. For instance, we can focus on the neutrophils:
+
+```{r, warning=FALSE, message=FALSE}
+celltype <- "Neutrophils"
+barplot(finotello_mcp[celltype,],
+        main = paste(celltype, "(MCP-counter)"), 
+        las = 2,
+        ylab = "Cell-type score",
+        col = "#cab2d6",
+        border = FALSE)
+```
+
+We can see that the sample "pbmc_4" is the one with the highest estimated abundance of neutrophils.
+
+❓ **Question:** How can we visualize the abundance score for CD8+ T cells, and what is the sample with the highest score?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, warning=FALSE, message=FALSE}
+celltype <- "CD8 T cells"
+barplot(finotello_mcp[celltype,],
+        main = paste(celltype, "(MCP-counter)"), 
+        las = 2,
+        ylab = "Cell-type score",
+        col = "#fdbf6f",
+        border = FALSE)
+which.max(finotello_mcp[celltype,])
+```
+
+</details>
+
+We want now to test on the same dataset a deconvolution method, rather than a scoring ones. We will focus on quanTIseq ([Finotello et al. Genome Medicine, 2019](https://link.springer.com/article/10.1186/s13073-019-0638-6)), which we can run through the `deconvolute_quantiseq` function in immunedeconv. Besides providing the object with the TPM values, we need to specifiy that the data come from an RNA-seq experiment and not microarrays (`arrays = FALSE`), it is from blood and not tumor samples (`tumor = FALSE`), and we want to apply a correction for mRNA abundance bias (`scale_mrna = TRUE`).
+
+```{r}
+
+finotello_quanTIseq <- deconvolute_quantiseq(finotello_tpm,
+                                             arrays = FALSE,
+                                             tumor = FALSE,
+                                             scale_mrna = TRUE) 
+```
+
+As before, we can check the object of results, and verify that, this time, cell fractions sum up to 100% in every sample:
+
+```{r, warning=FALSE, message=FALSE}
+
+dim(finotello_quanTIseq)
+head(finotello_quanTIseq)
+rownames(finotello_quanTIseq)
+apply(finotello_quanTIseq, 2, sum) 
+
+```
+
+Before proceeding with the plots, let's use RColorBrewer to generate a palette with 12 different colors:
+
+```{r, warning=FALSE, message=FALSE}
+pal_12 <- brewer.pal(12, "Set3")
+```
+
+```{r, echo=FALSE, eval=TRUE}
+#| fig-width: 8
+#| fig-height: 2.5
+
+image(1:12, 1, as.matrix(1:12), col = pal_12,
+      xlab = "", ylab = "", xaxt = "n", yaxt = "n",
+      main = "")
+```
+
+To visualize the composition of every sample, we can use a *stacked barplot* created with the `barplot` applied to the results object `finotello_quanTIseq`:
+
+```{r, warning=FALSE, message=FALSE}
+barplot(finotello_quanTIseq, 
+        col = pal_12, 
+        ylab = "Cell-type fractions",
+        las = 2, # Sample names (x-axis) arranged vertically
+        main = "quanTIseq deconvolution results",
+        border = FALSE)
+```
+
+To interpret the results, we need to add a legend to associate any color to the corresponding cell type. We use `par(mar = c(5, 4, 4, 10))` to leave some white space for the legend in the rightmost side of the plot; when we call `legend`, we also specify `xpd = TRUE` and `inset = -0.3` to allow to plot it outside of the plot, in this rightmost section left free.
+
+```{r, warning=FALSE, message=FALSE}
+
+par(mar = c(5, 4, 4, 10))
+
+barplot(finotello_quanTIseq, 
+        col = pal_12, 
+        ylab = "Cell-type fractions",
+        las = 2,
+        main = "quanTIseq deconvolution results",
+        border = FALSE)
+
+legend("right",
+       legend = rownames(finotello_quanTIseq),
+       fill = pal_12,
+       cex = 0.7,
+       bty = "n",
+       border = FALSE,
+       xpd = TRUE,
+       inset = -0.45)
+
+```
+
+**Note:**: This type of visualization is extremely informative for deconvolution methods that infer cell fractions that can be interpreted as such, providing a quantitative overview of the cellular composition of every sample. Such a plot would not be informative nor meaningful for scoring methods, like MCP-counter, which returns adimentional scores that *cannot* be compared across cell types:
+
+```{r, warning=FALSE, message=FALSE}
+
+par(mar = c(5, 4, 4, 10))
+
+barplot(finotello_mcp, 
+        col = pal_12, 
+        ylab = "Cell-type scores",
+        las = 2,
+        main = "MCP-counter results - NOT MEANINGFUL",
+        border = FALSE)
+
+legend("right",
+       legend = rownames(finotello_mcp),
+       fill = pal_12,
+       cex = 0.7,
+       bty = "n",
+       border = FALSE,
+       xpd = TRUE,
+       inset = -0.3)
+
+```
+
+Let's make a scatterplot to compare the agreement between MCP-counter and quanTIseq on their quantification of CD8+ T cells (called "Cytotoxic lymphocytes" by MCP-counter). We can also evaluate their agreement in terms of Pearson's correlation, which we can add to the plot:
+
+```{r, warning=FALSE, message=FALSE}
+
+cd8_mpc <- finotello_mcp["Cytotoxic lymphocytes", ]
+cd8_qts <- finotello_quanTIseq["T.cells.CD8", ]
+
+plot(cd8_mpc, cd8_qts,
+     xlab = "MCP-counter (cell scores)",
+     ylab = "quanTIseq (cell fractions)",
+     pch = 19,
+     cex = 1.5,
+     main = "CD8+ T cells")
+
+r_cd8 <- round(cor(cd8_mpc, cd8_qts), digits = 2)
+
+text(100, 0.45, labels = paste("r =", r_cd8))
+
+```
+
+❓ **Question:** What is the agreement of these two methods on the quantification of neutrophils?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, warning=FALSE, message=FALSE}
+
+neu_mpc <- finotello_mcp["Neutrophils", ]
+neu_qts <- finotello_quanTIseq["Neutrophils", ]
+
+plot(neu_mpc, neu_qts,
+     xlab = "MCP-counter (cell scores)",
+     ylab = "quanTIseq (cell fractions)",
+     pch = 19,
+     cex = 1.5,
+     main = "Neutrophils")
+
+r_neu <- round(cor(neu_mpc, neu_qts), digits = 2)
+
+text(13, 0.05, labels = paste("r =", r_neu))
+
+```
+
+</details>
+
+For this experiment, we also have some ground truth cell fractions obtained via fluorescence-activated cell sorting (FACS) of the same samples, which we can use to validate deconvolution results. We can load them with `readRDS`:
+
+Load the input data files into R.
+
+```{r, warning=FALSE, message=FALSE}
+
+finotello_truth <- readRDS("../Data/finotello_facs.rds")
+dim(finotello_truth)
+head(finotello_truth)
+rownames(finotello_truth)
+
+```
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+Before we compare deconvolution results from quanTIseq with the ground truth, let's identify which samples (`csamples`) and cell types (`ccells`) are in common between the two:
+
+```{r, warning=FALSE, message=FALSE}
+ccells <- intersect(rownames(finotello_quanTIseq),
+                    rownames(finotello_truth))
+csamples <- intersect(colnames(finotello_quanTIseq),
+                      colnames(finotello_truth))
+```
+
+We can now save in two new objects, a reduced version of the original matrix of deconvolution results (`finotello_quanTIseq_sel`) and ground-truth cell fractions (`finotello_truth_sel`), encompassing only the cell types and samples that are in common. This way, we also make sure that they appear in the same order in the two matrices, e.g., sample "pbmc_4" is always on the 5th column, and neutrophils are on the 3rd row of both objects.
+
+Generate a plot to visualize the results.
+
+```{r, warning=FALSE, message=FALSE}
+finotello_quanTIseq_sel <- finotello_quanTIseq[ccells, csamples]
+finotello_truth_sel <- finotello_truth[ccells, csamples]
+colnames(finotello_quanTIseq_sel)[5]
+colnames(finotello_truth_sel)[5]
+rownames(finotello_quanTIseq_sel)[3]
+rownames(finotello_truth_sel)[3]
+```
+
+Now we can create a `for` loop that iterates across all the common cell types (`ccells`) and: 1) makes a scatterplot of deconvolution results for that cell type vs. the ground truth; 2) adds the $x=y$ diagonal using `abline` representing a perfect prediction; and 3) add to the title the agreement quantified as Pearson's correlations (rounded to two decimals):
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+#| fig-width: 10
+#| fig-height: 10
+
+par(mfrow = c(3, 3)) 
+for (i in 1:length(ccells)) {
+  
+  ground_truth <- as.numeric(finotello_truth_sel[i,])
+  deconv_res <- as.numeric(finotello_quanTIseq_sel[i,])
+  celltype <- rownames(finotello_truth_sel)[i]
+  
+  r <- round(cor(ground_truth, deconv_res), digits = 2)
+
+  plot(ground_truth, deconv_res,
+       xlab = "True cell fractions",
+       ylab = "Estimated cell fractions",
+       main = paste0("quanTIseq - ", celltype, " (r = ", r, ")"),
+       pch = 19,
+       cex = 1.5,
+       cex.lab = 1.5, 
+       cex.axis = 1.5,
+       cex.main = 1.5,
+       col = pal_12[i])
+  abline(0,1) # x = y
+
+}
+
+```
+
+❓ **Question:** How would you consider the deconvolution performance for CD8+ T cells? And for regulatory T cells (Tregs)?
+
+We can also generate a similar plot were we visualize all cell types in the same plot, but with different colors. To do this, we can convert the two matrices of cell fractions into vectors, and save an associated vector with the color for every sample and cell type:
+
+```{r, warning=FALSE, message=FALSE}
+finotello_truth_sel_v <- as.numeric(finotello_truth_sel)
+finotello_quanTIseq_sel_v<- as.numeric(finotello_quanTIseq_sel)
+labels <- rep(rownames(finotello_truth_sel), 
+              times = ncol(finotello_truth_sel))
+colors <- pal_12[as.factor(labels)]
+```
+
+We can estimate Pearson's correlation for all cell types altogether, using these vectors:
+
+```{r, warning=FALSE, message=FALSE}
+r <- round(cor(finotello_truth_sel_v, 
+               finotello_quanTIseq_sel_v), 
+           digits = 2)
+```
+
+And we can now make the final plot:
+
+```{r, warning=FALSE, message=FALSE}
+par(mar = c(5, 4, 4, 14))   # wide right margin
+
+plot(finotello_truth_sel_v,
+     finotello_quanTIseq_sel_v,
+     xlab = "True cell fractions",
+     ylab = "Estimated cell fractions",
+     main = "quanTIseq (all cell types)",
+     xlim = c(0, 0.4),
+     ylim = c(0, 0.4),
+     pch = 19,
+     col = colors)
+
+abline(0, 1)
+text(0.05, 0.38, paste0("r = ", r))
+
+legend("right",
+       legend = unique(labels),
+       fill = unique(colors),
+       cex = 0.7,
+       y.intersp = 0.8,
+       x.intersp = 0.7,
+       bty = "n",
+       border = FALSE,
+       xpd = TRUE,
+       inset = -0.45)
+```
+
+❓ **Question:** Can you spot some cell types that are systematically over- or under-estimated?
+
+# Homework
+
+In this exercise, we will perform deconvolution analysis of a second bulk RNA-seq dataset generated from human blood peripheral blood mononuclear cells (PBMC) ([Hoek et al. Plos ONE, 2015](https://doi.org/10.1371/journal.pone.0118528)).
+
+We can load, from the "Data" folder, the gene expression matrix (TPM-normalized), as well as the FACS-derived ground-truth cell fractions for 5 cell types
+
+```{r, warning=FALSE, message=FALSE}
+
+hoek_tpm <- readRDS("../Data/hoek_tpm.rds")
+hoek_truth <- readRDS("../Data/hoek_facs.rds")
+rownames(hoek_truth)
+
+```
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+In this analysis, we will use another deconvolution method called EPIC ([Racle et al. eLife 2017](https://elifesciences.org/articles/26476)). As for quanTIseq, we need to specify `tumor = FALSE` and `scale_mrna = TRUE` in the parameter settings. Applied to this dataset with these settings, EPIC will quantify the following cell types:
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, eval=TRUE}
+hoek_epic <- deconvolute_epic(hoek_tpm,
+                              tumor = FALSE,
+                              scale_mrna = TRUE)
+rownames(hoek_epic)
+```
+
+As you notice by comparing the cell names to the ground truth ones, some can be directly compared like the "Monocytes", while some like "Bcells" and "NKcells" needs to be renamed in the object of deconvolution results, e.g.:
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE, eval=TRUE}
+idx <- which(rownames(hoek_epic) == "Bcells")
+rownames(hoek_epic)[idx] <- "B cells" # With a space
+```
+
+Moreover, we need to add a new row for the quantification of "T cells", calculated as the sum of "CD4_Tcells" and "CD8_Tcells", to be able to compare them to the ground-truth data:
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE, eval=TRUE}
+hoek_epic["T cells"] <- hoek_epic["CD4_Tcells"] + hoek_epic["CD8_Tcells"]
+```
+
+Check carefully the cell types present in the `hoek_epic` and `hoek_truth` objects, and adapt the former accordingly. After that, proceed with an analysis similar to that presented in the guided exercise, putting a special focus on the visualization of the per-sample cellular composition and the agreement of deconvolution results with the ground-truth cell fractions.
