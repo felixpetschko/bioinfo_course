@@ -1,0 +1,622 @@
+---
+title: Spatial transcriptomics data analysis
+author: "Prof. Francesca Finotello"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-floating: true
+execute:
+  echo: true
+  warning: true
+  message: true
+---
+
+<!-- Sys.setenv(QUARTO_R = "/gpfs/gpfs1/scratch/c9881023/shared/.conda/envs/spacedeconv-env/bin/Rscript") -->
+
+
+# Guided analysis
+
+In this exercise, we will analyze a spatial transcriptomics dataset from a breast cancer generated with the [10x Genomics](www.10xgenomics.com) Visium platform.
+
+## Data access and initialization
+
+Before we begin the analysis, let's set the seed of the random number generator as indicated below to ensure reproducible plots and results. Please note, however, that the results and generated plots may still show slight differences under certain circumstances.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+```
+
+This exercise relies on a number of R packages with specific dependencies. Run the command below to make sure they are all accessible:
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=TRUE}
+source("/scratch/c9881023/shared/Rprofile.R")
+```
+
+In this exercise, we will use the [Seurat](https://satijalab.org/seurat/) and the [spacedeconv](https://github.com/omnideconv/spacedeconv) R packages. Use the `library` function to load these packages along with additional dependencies needed for the analysis.
+
+```{r, warning=FALSE, message=FALSE}
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(glmGamPoi)
+library(presto)
+library(spacedeconv)
+library(SpatialExperiment)
+```
+
+The breast cancer spatial data we want to analyze is already saved as a Seurat object in the `brca_spatial_s4.rds` file. We can use the `readRDS` function to load it from the "Data" directory and assign it to a variable called `brca_sp`.
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sp <- readRDS("../Data/brca_spatial_s4.rds")
+print(brca_sp)
+```
+
+This object contains: 1) a spot-by-gene count matrix (3798 spots, 36,601 genes), and 2) an Hematoxylin and Eosin (H&E) image of the breast cancer tissue slide, which can be visualized with the following code:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialPlot(brca_sp, alpha = 0)
+```
+
+In the Seurat object, the spot-by-gene expression matrix is similar to a typical "RNA" Assay of a single-cell RNA sequencing (scRNA-seq) dataset, but contains spot-level, not single-cell-level data.
+
+Likewise, the initial preprocessing steps are similar to those of a typical scRNA-seq analysis, which starts from data quality control (QC) and preprocessing.
+
+As for scRNA-seq data, we have some QC covariates saved as metadata:
+
+```{r, warning=FALSE, message=FALSE}
+head(brca_sp@meta.data)
+```
+
+We can make a violin plot (`VlnPlot`) of the two main QC covariates, which report the total counts (`nCount_Spatial`) and the number of detected genes (`nFeature_Spatial`) per spot.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+VlnPlot(brca_sp, 
+        features = c("nCount_Spatial", "nFeature_Spatial"),
+        pt.size = 0.1) + NoLegend()
+```
+
+By leveraging the spatial coordinates associated to each spot, we can create a spatially-resolved plot of `nCount_Spatial`. In the code below, the `image.alpha = 0` parameter setting is used to remove the underlying H&E image, so to visualize only the molecular data:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, 
+                   features = "nCount_Spatial",
+                   image.alpha = 0) + 
+  theme(legend.position = "right")
+```
+
+❓ **Question:**  How do we create the same spatial plot for the `nFeature_Spatial` QC covariate?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, 
+                   features = "nFeature_Spatial",
+                   image.alpha = 0) + 
+  theme(legend.position = "right")
+```
+
+</details>
+
+These plots clearly show that the variation in molecular counts across spots is not only driven by technical factors, but also reflects differences in tissue composition and architecture.
+
+Next, we use `SCTransform` ([Hafemeister and Satija, Genome Biology 2019](https://doi.org/10.1186/s13059-019-1874-1)) to normalize the data and detect highly-variable genes features:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE, results='hide'}
+brca_sp <- SCTransform(brca_sp, 
+                       assay = "Spatial", 
+                       verbose = FALSE)
+```
+
+## Gene-centric spatial analysis
+
+In Seurat, we can use the `SpatialFeaturePlot` to visualize the expression levels of selected genes in a spatially-resolved fashion. For instance, we can use it to plot the spatial expression of: 1) KRT18 (Keratin 18), usually expressed by epithelial cells; 2) the fibroblast-specific marker COL1A2 (Collagen Type I Alpha 2 Chain); 3) and the main marker of CD8+ T cells, CD8B (CD8 Beta Chain). 
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, 
+                   features = c("KRT8", "COL1A2", "CD8B"),
+                   image.alpha = 0)
+```
+
+We can also remove the `image.alpha = 0` parameter settings to visualize also the underlying H&E image:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, features = "KRT8")
+```
+
+Reduce the size of the dot used to plot the expression data (over the H&E image):
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, features = "KRT8", pt.size.factor = 1)
+```
+
+Or render the dots a bit transparent to partially visualize the underlying H&E image:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialFeaturePlot(brca_sp, features = "KRT8", alpha = c(0.1, 1))
+```
+
+Also the subsequent steps of dimensionality reduction and clustering of the spatial data follow a workflow similar to the one used for scRNA-seq data analysis: 
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sp <- RunPCA(brca_sp, 
+                  assay = "SCT", 
+                  verbose = FALSE)
+brca_sp <- FindNeighbors(brca_sp, 
+                         reduction = "pca", 
+                         dims = 1:30)
+brca_sp <- FindClusters(brca_sp, 
+                        resolution = 0.5,
+                        verbose = FALSE)
+brca_sp <- RunUMAP(brca_sp, 
+                   reduction = "pca", 
+                   dims = 1:30)
+```
+
+We can then visualize the results of the clustering using Uniform Manifold Approximation and Projection (UMAP) using `DimPlot`.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+DimPlot(brca_sp, 
+        reduction = "umap", 
+        label = TRUE)
+```
+
+As an alternative, we can visualize how the different clusters are spatially organized in the native tissue, using the `SpatialDimPlot` function:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialDimPlot(brca_sp, label = TRUE, label.size = 3)
+```
+
+When the number of clusters and, thus, colors is high, it becomes challenging to resolve the exact spot-cluster association. The `SpatialDimPlot` allows specifying the `cells.highlight` to highlight selected set of spots; this parameter can be used to color only the spots belonging to selected specific clusters (cluster 1 and 4 in the plots below):
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+SpatialDimPlot(brca_sp, 
+               cells.highlight = 
+                 CellsByIdentities(object = brca_sp, idents = c(1, 4)),
+               facet.highlight = TRUE, ncol =2)
+```
+
+We can also perform differential expression (DE) analysis (`FindMarkers`) to compare these two clusters and identify cluster-specific genes.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+de_markers <- FindMarkers(brca_sp, ident.1 = 1, ident.2 = 4)
+head(de_markers)
+```
+
+The identified genes can be also plotted spatially to visualize their regionalization and confirm the colocalization with the associated clusters.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+#| fig-width: 12
+#| fig-height: 12
+
+SpatialFeaturePlot(object = brca_sp, 
+                   features = rownames(de_markers)[1:4], 
+                   alpha = c(0.1, 1), 
+                   ncol = 2)  
+```
+
+## Tissue composition analysis
+
+The spots from the 10x Visium assay encompass the expression profiles of multiple cells. One option to characterize the composition of every spot is through deconvolution analysis. A second option leverages instead the integration of the 10x Visium spatial data with an annotated scRNA-seq dataset. Seurat used this second approach to *transfer* the single-cell labels to the spatial data, inferring a probabilistic classification for each cell type and spot. 
+
+To perform this analysis, let's load a suitable breast cancer single-cell reference (`brca_sc_s4.rds`) into R and save it in an object called `brca_sc`.
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sc <- readRDS("../Data/brca_sc_s4.rds")
+```
+
+This dataset encompasses 20,835 genes and 2,500 cells:
+
+```{r, warning=FALSE, message=FALSE}
+print(brca_sc)
+```
+
+We first need to preprocess this dataset according to the usual single-cell Seurat workflow:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sc <- NormalizeData(brca_sc)
+brca_sc <- FindVariableFeatures(brca_sc, nfeatures = 2000)
+brca_sc <- ScaleData(brca_sc, features = rownames(brca_sc))
+brca_sc <- RunPCA(brca_sc)
+brca_sc <- FindNeighbors(brca_sc, 
+                       dims = 1:40) 
+brca_sc <- FindClusters(brca_sc, 
+                      resolution = 0.5,
+                      random.seed = 1234)
+brca_sc <- RunUMAP(brca_sc,
+                 dims = 1:40,
+                 n.neighbors = 30,
+                 min.dist = 0.3,
+                 seed.use = 1234)
+```
+
+For every cell, we have some associated labels, saved as metadata information:
+
+```{r, warning=FALSE, message=FALSE}
+head(brca_sc@meta.data)
+```
+
+Specifically, we have three sets of annotations, with different resolution/granularity:
+
+```{r, warning=FALSE, message=FALSE}
+cat("Coarse resolution:", 
+    length(unique(brca_sc@meta.data$celltype_coarse)),
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype_coarse))
+```
+
+```{r, warning=FALSE, message=FALSE}
+cat("Medium resolution", 
+    length(unique(brca_sc@meta.data$celltype)), 
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype))
+```
+
+```{r, warning=FALSE, message=FALSE}
+cat("Fine-grained resolution", 
+    length(unique(brca_sc@meta.data$celltype_fine)), 
+    "labels\n")
+print(unique(brca_sc@meta.data$celltype_fine))
+```
+
+We will use the *coarse* single-cell labels to annotate the spatial data. The code below performs this by integrating the single-cell and spatial datasets in Seurat: both objects are first normalized with `SCTransform`, anchor correspondences between them are identified with `FindTransferAnchors`, cell type labels are projected onto the spatial spots using `TransferData`, and finally the default assay is switched to `prediction.score.id` to make the predicted scores accessible for downstream visualization.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE, results='hide'}
+brca_sp <- SCTransform(brca_sp,
+                       assay = "Spatial")
+brca_sc <- SCTransform(brca_sc)
+anchors <- FindTransferAnchors(reference = brca_sc, 
+                               query = brca_sp,
+                               normalization.method = "SCT",
+                               reference.assay = "SCT",
+                               query.assay = "SCT")
+brca_sp <- TransferData(anchorset = anchors, 
+                        query = brca_sp,
+                        slot = "data",
+                        refdata = brca_sc@meta.data$celltype_coarse, 
+                        prediction.assay = TRUE)
+DefaultAssay(brca_sp) <- "prediction.score.id"
+```
+
+Now we can plot the cell-type specific predictions, for a selection of cell types of interest, with `SpatialFeaturePlot`:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+#| fig-width: 12
+#| fig-height: 12
+
+SpatialFeaturePlot(brca_sp, 
+                   features = c("Cancer Epithelial", 
+                                "Myeloid", 
+                                "T-cells", 
+                                "B-cells"), 
+                   ncol = 2)
+```
+
+## Advanced spatial analysis with spacedeconv
+
+To perform a more advanced analysis of tissue composition and function, we will use the [spacedeconv](https://github.com/omnideconv/spacedeconv/) R package.
+
+spacedeconv assumes that the single-cell data is saved in the form of a `SingleCellExperiment` object, and the spatial data in the form of a `SpatialExperiment` object. Let's first convert the single-cell Seurat object using `as.SingleCellExperiment` and save it in a new variable called `brca_sc`:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sce <- as.SingleCellExperiment(brca_sc)
+```
+
+The conversion of the spatial data is not straightforward, so we will directly import the same 10x Visium dataset directly in a form of a `spatialExperiment` object, and save it in the `brca_spe` variable:
+
+::: callout-warning
+The path to "Data" assumes a specific folder structure. Adjust it to match the location of the "Data" folder on your system (e.g., "/gpfs/gpfs1/scratch/c9881023/shared/Data").
+:::
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_spe <- readRDS("../Data/brca_spe.rds")
+```
+
+We will now use spacedeconv to preprocess both the spatial and single-cell data, and to normalize the spatial data. In the code below, we will write function calls explicitly as `package::function` to indicate that these functions come from spacedeconv and not from other packages that might define functions with the same name.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sce <- spacedeconv::preprocess(brca_sce)
+brca_spe <- spacedeconv::preprocess(brca_spe)
+brca_spe <- spacedeconv::normalize(brca_spe, method = "cpm")
+```
+
+We will now use the spatialDWLS deconvolution method ([Dong and Yuan, Genome Biology 2021](https://link.springer.com/article/10.1186/s13059-021-02362-7)) to deconvolute each spatial spot. Since spatialDWLS is a "second-generation" method, meaning that it leverages annotated single-cell data, the analysis is performed in two steps: 1) generation of a signature matrix from the annotated single-cell data; and 2) deconvolution of the spatial data using this matrix. Although spatialDWLS is one of the fastest single-cell-informed deconvolution methods for spatial transcriptomics, the next two steps may still take some time 🐢.
+
+The signature will be created with the `build_model` function from spacedeconv, specifying, besides the input single-cell data, the cell-type annotation to be used (`celltype_coarse`) and the selected deconvolution method (`spatialdwls`). We will save the generated signature in an object called `brca_sdwls_sig`.
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_sdwls_sig <- spacedeconv::build_model(single_cell_obj = brca_sce,
+                                           cell_type_col = "celltype_coarse",
+                                           method = "spatialdwls",
+                                           verbose = TRUE)
+```
+
+We can now perform the deconvolution step using the `deconvolute` function. We need to specify, besides the input spatial object to be deconvoluted: the wanted deconvolution method (`"spatialdwls"`), the specific slot with the normalized spatial data to be used (CPM for spatialDWLS, `assay_sp = "cpm"`), and the name of the object containing the signature matrix (`brca_sdwls_sig`). The final results will be saved again in the spatial object `brca_spe`. 
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_spe <- spacedeconv::deconvolute(spatial_obj = brca_spe,
+                                           method = "spatialdwls",
+                                           assay_sp = "cpm",
+                                           signature = brca_sdwls_sig)
+```
+
+To check which cell types were deconvoluted with spatialDWLS and how they were saved in `brca_spe`, we can check the column names of `colData(brca_spe)`. `colData(brca_spe)` can encompass many columns, as it stores all results computed from different spacedeconv analyses that are performed on the spatial object. To identify only spatialDWLS's deconvolution results, we can extract only the column names that start with `spatialdwls_` using the code reported below:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+sdwls_celltypes <- colnames(colData(brca_spe))
+sdwls_celltypes <- sdwls_celltypes[grep("^spatialdwls_", sdwls_celltypes)]
+sdwls_celltypes
+```
+
+We can now use the `plot_spatial` function of spacedeconv to plot myeloid cell fractions estimated for every spot (`spatialdwls_Myeloid`):
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_spatial(
+  spe = brca_spe,
+  result = "spatialdwls_Myeloid",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "Myeloid cells",
+  density = FALSE
+)
+```
+
+We can transform the estimated cell fractions via local smoothing to reduce data skewness and reveal more clearly myeloid-cell-enriched regions:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_spatial(
+  spe = brca_spe,
+  result = "spatialdwls_Myeloid",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "Myeloid cells",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Let's generate also a smoothed spatial plot of B-cell fractions:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_spatial(
+  spe = brca_spe,
+  result = "spatialdwls_B.cells",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "B cells",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+❓ **Question:** How can we generate a smoothed spatial plot of T-cell fractions?
+
+<details>
+
+<summary>Click to see the answer</summary>
+
+**Answer:**
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_spatial(
+  spe = brca_spe,
+  result = "spatialdwls_T.cells",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "T cells",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+</details>
+
+In addition to these spatial plots for the individual cell types, the `plot_comparison` function of spacedeconv can be used to contrast the differential localization of pairs of cell types, revealing which one is prevalent in each spot. By plotting the log-fold change of the deconvolved myeloid (`spatialdwls_Myeloid`) vs. tumor cell fractions (`spatialdwls_Cancer.Epithelial`) with this function, we can identify regions where myeloid cells are more abundant (in green), tumor cells are more abundant (in purple), or where they have equal proportions (in white). 
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+spacedeconv::plot_comparison(
+  brca_spe,
+  cell_type_1 = "spatialdwls_Myeloid",
+  cell_type_2 = "spatialdwls_Cancer.Epithelial",
+  sample_id = "brca",
+  image_id = "lowres",
+  density = FALSE,
+  smooth = TRUE,
+  title = "Tumor vs. myeloid cells",
+  palette = "Purple-Green",
+  reverse_palette = FALSE,
+  shift_positive = FALSE,
+  nDigits = 2
+)
+```
+
+The `plot_most_abundant` function can be instead used to visualize the most abundant cell type in every spot. In the code below, only cell types with a minimum abundance of 5% in the whole slide (`min_abundance = 0.05`) are considered for the plot:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_most_abundant(
+  brca_spe,
+  method = "spatialdwls",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "Most abundant",
+  min_abundance = 0.05
+)
+```
+
+By default, the `plot_most_abundant` function uses the same *sequential* palette that is used to visualize the cell fraction/abundance scores. To visualize categorical data (i.e., distinct classes like cell labels or clusters), it is better to use a *qualitative* palette (e.g., `palette = "Accent"`).
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+plot_most_abundant(
+  brca_spe,
+  method = "spatialdwls",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "Most abundant",
+  min_abundance = 0.05,
+  palette = "Accent"
+)
+```
+
+To complement deconvolution analysis, spacedeconv gives access to *footprint* methods for the inference of pathway and transcription factor (TF) activities via decoupleR ([Badia-i-Mompel et al. Bioinformatics Advances 2022](https://doi.org/10.1093/bioadv/vbac016)). Let's use CollecTRI ([Müller-Dott et al. Nucleic Acid Research 2023,](https://doi.org/10.1093/nar/gkad841)) to estimate TF activity. The analysis can be performed in two steps (both of which take some time 🐢).
+
+First, we download CollecTRI annotations with the `get_decoupleR_reference` function, and save it in the `tf_ref` object:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+tf_ref <- get_decoupleR_reference(method = "collectri", 
+                                  organism = "human")
+```
+
+Then we perform footprint analysis of the CPM-normalized data contained in the spatial object (`assay = "cpm"`), using the reference annotations downloaded at the previous step (`reference = tf_ref`), and specifying weighted mean as method of choice for computing the activity scores (`method = "wmean"`).
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+brca_spe <- compute_activities(brca_spe, 
+                                     reference = tf_ref, 
+                                     method = "wmean", 
+                                     assay = "cpm")
+```
+
+We can now use again the `plot_spatial` function to plot the inferred activity for the MYC transcription factor:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE, echo=TRUE}
+plot_spatial(
+  spe = brca_spe,
+  result = "collectri_MYC",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "MYC activity",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Before we move to the next exercise, let's save the `brca_spe` object we have been analyzing in spacedeconv using `saveRDS`:
+
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+saveRDS(brca_spe, file = "brca_spacedeconv.rds")
+```
+
+::: callout-warning
+Adapt the file path of the code above to save the file in your directory of choice, where you have writing access.
+:::
+
+# Homework
+
+In this exercise, we will expand the spacedeconv-based analyses performed above on the breast cancer spatial dataset. Let's load again the spacedeconv object saved in `brca_spacedeconv.rds`:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE, echo=TRUE}
+brca_spe <- readRDS("brca_spacedeconv.rds")
+```
+
+::: callout-warning
+Adapt the file path of the code above to load the file from the directory where you saved it.
+:::
+
+For this exercise, we will focus on cancer-associated fibroblasts (CAFs), an important cell population in the tumor microenvironment. CAFs contribute to cancer development by interacting with tumor cells, remodeling the surrounding tissue, and affecting immune activity. In breast cancer, they are especially relevant because they are often abundant and can promote tumor progression and resistance to therapy.
+
+Explore visually the spatial location of CAFs according to the deconvolution results obtained with spatialDWLS.
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+plot_spatial(
+  spe = brca_spe,
+  result = "spatialdwls_CAFs",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "CAFs (spatialDWLS)",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Next, perform deconvolution, this time using a "first-generation" method: EPIC ([Racle et al. eLife 2017](https://elifesciences.org/articles/26476)). Spatial deconvolution with EPIC can be performed with the `deconvolute` function of spacedeconv, this time, without building the signature matrix, as it is already embedded within the method. When calling this function, we need to specify, besides the input object `brca_spe` the method (`method = "epic"`) and the assay with the CPM-normalized data (`assay_sp = "cpm"`). 
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+brca_spe <- spacedeconv::deconvolute(spatial_obj = brca_spe,
+                                           method = "epic",
+                                           assay_sp = "cpm")
+```
+
+Once the deconvolution results are generated, we can check which cell types were quantified by EPIC (and their exact names) by extracting the relevant column names from `colData(brca_spe)`, as we did above. 
+
+Use this approach to identify the correct label to access EPIC's quantifications of CAF cell fractions, and visualize them in a spatial plot.
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+epic_celltypes <- colnames(colData(brca_spe))
+epic_celltypes <- epic_celltypes[grep("^epic_", epic_celltypes)]
+epic_celltypes
+
+plot_spatial(
+  spe = brca_spe,
+  result = "epic_Cancer.associated.fibroblast",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "CAFs (EPIC)",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Run *footprint* analysis again, but this time focusing on pathway activity inference, which can be performed leveraging PROGENy reference annotations ([Schubert et al. Nature Communications 2018](https://www.nature.com/articles/s41467-017-02391-6)). 
+
+Also in this case, the reference can be obtained using the `get_decoupleR_reference` function but, this time, the method of choice must be set to PROGENY (`method = "progeny"`). Save the obtained reference annotations in a new object called `pw_ref`. 
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+pw_ref <- get_decoupleR_reference(method = "progeny", 
+                                  organism = "human")
+```
+
+Now compute pathway activities using again the `compute_activities`, setting the method to `progeny` and specifying the `pw_ref` object generated at the previous step via the `reference` parameter.
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+brca_spe <- compute_activities(brca_spe, 
+                                     reference = pw_ref, 
+                                     method = "wmean", 
+                                     assay = "cpm")
+```
+
+The following pathway activity results will be computed and saved in `colData(brca_spe)`:
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE, echo=FALSE}
+# progeny_pw <- colnames(colData(brca_spe))
+# progeny_pw <- progeny_pw[grep("^progeny_", progeny_pw)]
+progeny_pw <-  c("progeny_Androgen", "progeny_EGFR", "progeny_Estrogen", "progeny_Hypoxia",
+                 "progeny_JAK.STAT", "progeny_MAPK", "progeny_NFkB", "progeny_PI3K",   
+                 "progeny_TGFb","progeny_TNFa", "progeny_Trail", "progeny_VEGF",
+                 "progeny_WNT", "progeny_p53")
+progeny_pw
+```
+
+Check the spatial plot of TGFβ pathway activity and compare it with the deconvolution results. Does it colocalize with any specific cell type? Is this observation consistent with the expected biology of the tumor microenvironment?
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, echo=FALSE}
+plot_spatial(
+  spe = brca_spe,
+  result = "progeny_TGFb",
+  sample_id = "brca",
+  image_id = "lowres",
+  title = "TGFb activity",
+  smooth = TRUE,
+  density = FALSE
+)
+```
+
+Explore the spatial distribution of additional cell types quantified with EPIC and/or spatialDWLS, as well as other pathways quantified with PROGENy. Choose some results that you consider particularly interesting, and try to interpret them in the context of the breast cancer tumor microenvironment. For instance, ask whether the spatial patterns you observe may reflect differences in stromal content, immune cell infiltration, or localized pathway activity. You can also try other visualization functions available in spacedeconv, such as plot_most_abundant and plot_comparison. 
+
+In addition, you may experiment with other quick first-generation deconvolution or scoring methods, such as ESTIMATE or MCP-counter. In contrast, I would not recommend testing other second-generation methods here, because they usually take much longer to run and their parameters are not always easy to set correctly.
+
+
